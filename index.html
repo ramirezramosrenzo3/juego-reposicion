@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#1d4ed8">
+  <title>Juego de Reposición</title>
+  <style>
+    :root {
+      --azul: #1d4ed8;
+      --fondo: #f3f5f9;
+      --tarjeta: #ffffff;
+      --texto: #111827;
+      --gris: #6b7280;
+      --borde: #e5e7eb;
+      --verde: #15803d;
+      --rojo: #b91c1c;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: var(--fondo);
+      color: var(--texto);
+      font-size: 16px;
+      line-height: 1.4;
+      padding: env(safe-area-inset-top) 0 env(safe-area-inset-bottom);
+    }
+    #app { max-width: 720px; margin: 0 auto; padding: 12px; }
+    h1 { font-size: 1.5rem; margin: 6px 0 8px; }
+    h2 { font-size: 1.15rem; margin: 18px 0 6px; }
+    h3 { font-size: 1rem; margin: 14px 0 6px; }
+    p { margin: 6px 0; }
+    .card {
+      background: var(--tarjeta);
+      border: 1px solid var(--borde);
+      border-radius: 14px;
+      padding: 14px;
+      margin-bottom: 12px;
+    }
+    .ayuda { color: var(--gris); font-size: 0.92rem; }
+    .estado { color: var(--gris); font-size: 0.92rem; }
+    .aviso { color: var(--rojo); font-weight: 600; min-height: 1.2em; margin: 8px 0 0; }
+    label { display: block; margin: 10px 0; font-weight: 600; font-size: 0.95rem; }
+    input, select {
+      display: block;
+      width: 100%;
+      margin-top: 4px;
+      padding: 10px;
+      font-size: 16px;
+      border: 1px solid #cfd4dc;
+      border-radius: 10px;
+      background: #fff;
+    }
+    input.link { font-size: 0.85rem; color: var(--gris); }
+    .fila { display: flex; gap: 10px; flex-wrap: wrap; }
+    .fila > * { flex: 1 1 200px; }
+    button {
+      width: 100%;
+      padding: 13px;
+      margin: 10px 0 4px;
+      font-size: 1rem;
+      font-weight: 700;
+      border: none;
+      border-radius: 12px;
+      cursor: pointer;
+    }
+    button.principal { background: var(--azul); color: #fff; }
+    button.principal:disabled { background: #9ca3af; cursor: not-allowed; }
+    button.secundario { background: #e5e7eb; color: var(--texto); }
+    .barra {
+      position: sticky;
+      top: 0;
+      z-index: 2;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+      background: var(--azul);
+      color: #fff;
+      padding: 12px 14px;
+      border-radius: 14px;
+      margin-bottom: 10px;
+    }
+    .tiempo { font-variant-numeric: tabular-nums; font-weight: 700; }
+    .scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; margin: 6px 0; }
+    table { border-collapse: collapse; width: 100%; font-size: 0.9rem; }
+    th, td {
+      padding: 7px 6px;
+      border-bottom: 1px solid var(--borde);
+      text-align: right;
+      vertical-align: top;
+    }
+    td { white-space: normal; }
+    th { color: var(--gris); font-weight: 600; font-size: 0.8rem; white-space: nowrap; }
+    th:first-child, td:first-child { text-align: left; }
+    table.form td input, table.form td select { margin: 0; padding: 8px; }
+    table.form td { text-align: left; }
+    table.conj td:nth-child(2) { min-width: 130px; }
+    table.conj td:nth-child(3) { text-align: left; font-size: 0.85rem; }
+    tr.mio td { background: #eff6ff; }
+    .pos { color: var(--verde); font-weight: 600; }
+    .neg { color: var(--rojo); font-weight: 600; }
+    .chip {
+      display: inline-block;
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      margin-right: 6px;
+      vertical-align: middle;
+      border: 1px solid rgba(0, 0, 0, 0.2);
+    }
+    .codigo { font-size: 1.6rem; letter-spacing: 4px; color: var(--azul); }
+    .lista { padding-left: 18px; }
+    .ganador { font-size: 1.2rem; font-weight: 700; }
+    .equipo { flex: 1 1 200px; }
+    small { color: var(--gris); }
+    @media (max-width: 480px) {
+      table { font-size: 0.8rem; }
+      th, td { padding: 6px 4px; }
+      th { font-size: 0.72rem; white-space: normal; }
+    }
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+
+  <!-- Supabase (base de datos y tiempo real) -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <!-- Configuración: URL y clave de tu proyecto de Supabase -->
+  <script src="config.js"></script>
+  <!-- Reglas del juego -->
+  <script src="game.js"></script>
+  <!-- Pantallas y conexión -->
+  <script src="app.js"></script>
+</body>
+</html>
