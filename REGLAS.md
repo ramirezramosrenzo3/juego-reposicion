@@ -1,10 +1,11 @@
-# Reglas del juego de reposición (versión 3)
+# Reglas del juego de reposición (versión 3.1: con bots)
 
 Esta es la referencia del juego. Los números exactos están en `game.js` (bloque `CONFIG`, `PRODUCTOS`, `CALIDADES`, `INFLUENCERS`). Si este documento y el código no coinciden, avísame para corregir uno de los dos.
 
 ## 1. Equipos y roles
 
-- 2 equipos de 3 personas. El anfitrión inicia la partida y el juego sortea los equipos y los roles.
+- 2 equipos de 3 jugadores. El anfitrión inicia la partida y el juego sortea los equipos y los roles.
+- Un lugar puede ocuparlo una persona o un **bot** (sección 16): no hacen falta 6 personas.
 - Cada equipo tiene la misma cadena: **Fábrica → Distribuidor → Tienda final → clientes**.
 - Cada rol es responsable de un área:
   - **Fábrica:** decide la **calidad** de cada sabor y **cuánto producir**.
@@ -16,7 +17,7 @@ Esta es la referencia del juego. Los números exactos están en `game.js` (bloqu
 - Cada semana dura el tiempo que elige el anfitrión (por defecto 60 segundos, de 20 a 180).
 - La partida dura **30 semanas** por defecto (de 5 a 60).
 - Todas las decisiones son **simultáneas**: nadie ve lo que deciden los demás hasta que se cierra la semana.
-- La semana se cierra cuando los 6 jugadores deciden, o cuando se acaba el tiempo.
+- La semana se cierra cuando los 6 jugadores deciden, o cuando se acaba el tiempo. Los bots deciden solos apenas empieza la semana, así que con una persona y 5 bots la semana se cierra cuando esa persona decide.
 - Puedes cambiar tu decisión hasta que se cierre la semana. Nadie ve las decisiones de los demás antes del cierre.
 - Cualquiera puede salir de la sala durante la espera. Si el anfitrión sale durante la espera, la sala se borra.
 - Si un jugador no decide a tiempo, esa semana su equipo no cambia precio ni calidad, **no envía pedidos ni produce, y no puja**. Lo que ya tenía en stock se sigue vendiendo.
@@ -143,3 +144,27 @@ Estos valores no vienen de tu lista original; los propuse para que el juego func
 - Capacidad de producción por sabor (sección 6).
 - Pedido máximo por sabor: 500 unidades. Puja máxima: $10,000.
 - Desempate de la subasta por calidad promedio (sección 11).
+- Reglas de los bots (sección 16): cobertura de 4 semanas de demanda, calidad estándar, precio $4.50, ofertas del 15% al 25% de la ganancia esperada de un influencer.
+
+## 16. Bots
+
+Un bot es un jugador que maneja el juego. Ocupa un lugar (fábrica, distribuidor o tienda) y sus decisiones cuentan igual que las de una persona: su equipo gana o pierde con ellas.
+
+**Cómo se usan**
+- El anfitrión puede llenar con bots los lugares vacíos de la sala de espera, o empezar una partida de prueba desde la pantalla de inicio (1 persona + 5 bots).
+- Si una persona entra con el código a una sala que ya está llena, toma el lugar de un bot.
+- Los bots deciden **apenas empieza cada semana**. Sus decisiones las envía el celular de cualquier persona que tenga la partida abierta; si todas las personas cierran la página, la partida se detiene hasta que alguien vuelva.
+
+**Qué deciden** (todo está en `game.js`, bloque `BOT` y función `decisionBot`)
+- Solo miran su propio equipo (stock, pedidos en camino y lo ocurrido las últimas 3 semanas) y los influencers libres u ocupados. No ven las decisiones de la semana en curso del rival.
+- Para estimar cuánto se va a pedir o vender usan el **promedio de las últimas 3 semanas**; en la primera semana suponen que cada equipo atiende la mitad de la demanda del mercado.
+- **Fábrica:** calidad estándar en todos los sabores. Produce lo necesario para tener, entre stock y producción en camino, **4 semanas** de lo que suele pedirle el distribuidor (sin pasar la capacidad del sabor).
+- **Distribuidor:** pide a la fábrica para tener **4 semanas** de lo que suele pedirle la tienda. Puja por un influencer libre solo si la tienda tiene al menos 1.5 semanas de stock; ofrece entre el 15% y el 25% de la ganancia extra que estima (varía por semana). Nunca puja por un influencer ocupado.
+- **Tienda:** precio de $4.50 en todos los sabores, y pide al distribuidor para tener **4 semanas** de la demanda reciente.
+- No usan azar: la misma situación da siempre la misma decisión, por eso todos los celulares ven exactamente la misma partida.
+
+**Qué esperar de ellos** (resultado de 200 partidas simuladas de 30 semanas)
+- Dos equipos de bots atienden alrededor del 98% de la demanda y quedan parejos: cada uno gana cerca de la mitad de las partidas.
+- Un equipo de bots le gana siempre a un equipo que no decide nada.
+- Ofrecer poco por los influencers rinde más que ofrecer mucho cuando ambos equipos pujan; por eso las ofertas son del 15% al 25%.
+- No son expertos: son un rival razonable para probar el juego y completar equipos, no un jugador óptimo.

@@ -1,5 +1,5 @@
 /*
-  MOTOR DEL JUEGO DE REPOSICIÓN (versión 3)
+  MOTOR DEL JUEGO DE REPOSICIÓN (versión 3.1: con bots)
   -----------------------------------------
   Función pura y determinista: con la misma semilla y las mismas decisiones,
   cualquier celular calcula exactamente el mismo resultado.
@@ -55,7 +55,7 @@
   const N = PRODUCTOS.length;
 
   // Versión del motor: se muestra en la sala para detectar celulares con reglas distintas
-  const VERSION = '3.0';
+  const VERSION = '3.1';
 
   // ---------- UTILIDADES ----------
   const zeros = () => Array(N).fill(0);
@@ -431,10 +431,93 @@
     };
   }
 
+  // ---------- BOTS ----------
+  // Un bot decide solo con lo que muestra el estado de la partida (sin azar):
+  // cualquier celular que calcule la decisión de un bot obtiene exactamente la misma.
+  // Regla de inventario: mantener "cobertura" semanas de demanda entre stock y pedidos en camino.
+  const BOT = {
+    cobertura: 4.0,         // semanas de demanda que intenta tener (2 de espera + margen)
+    ventana: 3,             // semanas recientes que mira para estimar la demanda
+    minCoberturaPuja: 1.5,  // solo puja si la tienda tiene stock para atender más demanda
+    // Qué parte de la ganancia esperada ofrece en cada puja (varía por semana). Probado en
+    // simulación: ofrecer poco gana más que ofrecer mucho cuando ambos equipos pujan.
+    fraccionesPuja: [0.15, 0.2, 0.25],
+  };
+
+  // Promedio de un dato de las últimas semanas (p. ej. lo que pidió el distribuidor)
+  function promedioReciente(estado, X, campo, i, porDefecto) {
+    const h = estado.historial.slice(-BOT.ventana);
+    if (!h.length) return porDefecto;
+    return h.reduce((a, r) => a + r.equipos[X][campo][i], 0) / h.length;
+  }
+  const enCamino = (eq, clave, i) =>
+    eq.enTransito[clave].filter((e) => e.p === i).reduce((a, e) => a + e.q, 0);
+  // Unidades a pedir para volver a la cobertura objetivo
+  const faltante = (necesidad, posicion, tope) =>
+    clamp(Math.ceil(necesidad * BOT.cobertura - posicion), 0, tope);
+
+  // estado = partida después de cerrar la semana t-1; t = semana que se decide.
+  // Devuelve el mismo formato que envía una persona (ver "payloads por rol").
+  function decisionBot(estado, X, rol, t) {
+    const eq = estado.equipos[X];
+    const mitad = (i) => PRODUCTOS[i].demMedia / 2;   // cada equipo atiende ~la mitad del mercado
+
+    if (rol === 'fabrica') {
+      return {
+        calidad: PRODUCTOS.map(() => 'estandar'),
+        produccion: PRODUCTOS.map((p, i) => faltante(
+          promedioReciente(estado, X, 'pedidoFab', i, mitad(i)),
+          eq.stock.fabrica[i].q + enCamino(eq, 'prod', i),
+          p.capProd)),
+      };
+    }
+
+    if (rol === 'distribuidor') {
+      const pedido = PRODUCTOS.map((p, i) => faltante(
+        promedioReciente(estado, X, 'pedidoDist', i, mitad(i)),
+        eq.stock.distribuidor[i].q + enCamino(eq, 'fd', i),
+        CONFIG.tope));
+
+      // Cuánta demanda atiende la tienda y qué tan cubierta está (para decidir si conviene un influencer)
+      let demanda = 0;
+      let margen = 0;
+      let posicion = 0;
+      PRODUCTOS.forEach((p, i) => {
+        const d = promedioReciente(estado, X, 'demanda', i, mitad(i));
+        demanda += d;
+        margen += d * Math.max(0, eq.precio[i] - CONFIG.costoBase * CALIDADES[eq.calidad[i]].costo);
+        posicion += eq.stock.tienda[i].q + enCamino(eq, 'dt', i);
+      });
+      const hayStock = demanda > 0 && posicion / demanda >= BOT.minCoberturaPuja;
+      const pujas = INF_KEYS.map((k, idx) => {
+        const inf = estado.inf[k];
+        if (t < inf.ocupadoHasta || !hayStock) return null;
+        const info = INFLUENCERS[k];
+        const alza = (info.min + info.max) / 2;
+        // ~70% del alza de demanda llega a ventas (el mercado se reparte con el rival)
+        const ganancia = margen * alza * 0.7 * CONFIG.duracionInfluencer;
+        const fr = BOT.fraccionesPuja[(t + idx) % BOT.fraccionesPuja.length];
+        const monto = Math.min(CONFIG.topeMonto, Math.floor(ganancia * fr));
+        return monto >= 1 ? { monto } : null;
+      });
+      return { pedido, pujas };
+    }
+
+    // tienda
+    const precio = [];
+    const pedido = PRODUCTOS.map((p, i) => {
+      const d = promedioReciente(estado, X, 'demanda', i, mitad(i));
+      const pos = eq.stock.tienda[i].q + enCamino(eq, 'dt', i);
+      precio.push(CONFIG.precioBase);
+      return faltante(d, pos, CONFIG.tope);
+    });
+    return { precio, pedido };
+  }
+
   const API = {
     VERSION, CONFIG, PRODUCTOS, CALIDADES, INFLUENCERS, INF_KEYS, EQUIPOS, ROLES,
     estadoInicial, avanzarRonda, reproducir, armarDecisiones, puntajes, sumaUtil,
-    factorInfluencers, calidadPromedio, crearRng, leerDecision,
+    factorInfluencers, calidadPromedio, crearRng, leerDecision, decisionBot, BOT,
   };
 
   if (typeof module !== 'undefined' && module.exports) {

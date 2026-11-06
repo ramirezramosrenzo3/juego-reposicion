@@ -1,5 +1,5 @@
 /*
-  INTERFAZ DEL JUEGO (versión 3)
+  INTERFAZ DEL JUEGO (versión 3.1: con bots)
   Se conecta a Supabase (salas y decisiones) y usa game.js (las reglas).
   Cada celular refresca cada 1.2 segundos y recalcula el estado completo.
 */
@@ -29,7 +29,7 @@
   };
   // Solo las columnas que la base permite leer (los ids y el anfitrión son secretos)
   const COLS_SALA = 'codigo,estado,total_rondas,segundos,semilla,iniciada_en,creada_en';
-  const COLS_JUG = 'sala,nombre,equipo,rol,unido_en,es_anfitrion';
+  const COLS_JUG = 'sala,nombre,equipo,rol,unido_en,es_anfitrion,es_bot';
   const COLS_RON = 'sala,numero,cerrada_en';
   const COLS_DEC = 'sala,ronda,equipo,rol,payload,enviada_en';
 
@@ -75,6 +75,10 @@
     if (/failed to fetch|networkerror|load failed|network/i.test(m)) {
       return 'Sin conexión, reintentando… (revisa tu internet y config.js)';
     }
+    // Se subieron los archivos nuevos pero falta pegar el supabase.sql nuevo en Supabase
+    if (/could not find the function|schema cache|es_bot/i.test(m)) {
+      return 'Falta actualizar la base de datos: pega de nuevo todo supabase.sql en Supabase > SQL Editor > Run (ver GUIA.md).';
+    }
     return m;
   };
   const tabla = (cab, filas, clase = '') =>
@@ -109,6 +113,7 @@
           </label>
         </div>
         <button class="principal" data-accion="crear">Crear sala</button>
+        <button class="secundario" data-accion="solo">🤖 Probar solo con 5 bots (empieza al instante)</button>
         <h2>Unirse a una sala</h2>
         <label>Código de sala (4 letras o números)
           <input id="codigo" value="${esc(codigoUrl)}" maxlength="4" autocapitalize="characters" autocomplete="off">
@@ -166,6 +171,36 @@
     });
     if (error) return aviso(mensajeError(error));
     entrar(data);
+  }
+
+  // Crea una sala, la llena con 5 bots y empieza la partida (para probar sin otras personas)
+  async function jugarSolo() {
+    nombre = val('nombre').trim();
+    const crear = await sb.rpc('crear_sala', {
+      p_nombre: nombre, p_jugador: jugadorId, p_rondas: Number(val('rondas')), p_segundos: Number(val('segundos')),
+    });
+    if (crear.error) return aviso(mensajeError(crear.error));
+    const codigo = crear.data;
+    const bots = await sb.rpc('completar_bots', { p_codigo: codigo, p_jugador: jugadorId });
+    if (bots.error) {
+      await sb.rpc('salir_sala', { p_codigo: codigo, p_jugador: jugadorId });   // no deja una sala a medias
+      return aviso(mensajeError(bots.error));
+    }
+    const ini = await sb.rpc('iniciar_sala', { p_codigo: codigo, p_jugador: jugadorId });
+    if (ini.error) return aviso(mensajeError(ini.error));
+    entrar(codigo);
+  }
+
+  async function completarBots() {
+    const { error } = await sb.rpc('completar_bots', { p_codigo: sala, p_jugador: jugadorId });
+    if (error) return aviso(mensajeError(error));
+    refrescar();
+  }
+
+  async function quitarBots() {
+    const { error } = await sb.rpc('quitar_bots', { p_codigo: sala, p_jugador: jugadorId });
+    if (error) return aviso(mensajeError(error));
+    refrescar();
   }
 
   async function unirse() {
@@ -238,6 +273,9 @@
     try {
       const a = b.dataset.accion;
       if (a === 'crear') await crearSala();
+      else if (a === 'solo') await jugarSolo();
+      else if (a === 'bots') await completarBots();
+      else if (a === 'sin-bots') await quitarBots();
       else if (a === 'unirse') await unirse();
       else if (a === 'iniciar') await iniciar();
       else if (a === 'enviar-dec') await enviarDec();
@@ -256,10 +294,12 @@
     ocupado = true;
     ocupadoDesde = Date.now();
     try {
-      const [s, j, r, d, yo] = await Promise.all([
+      // Las semanas cerradas se leen ANTES que las decisiones: así toda semana cerrada ya trae
+      // sus decisiones completas y el cálculo nunca queda a medias (los bots dependen de eso).
+      const r = await sb.from('rondas').select(COLS_RON).eq('sala', sala).order('numero');
+      const [s, j, d, yo] = await Promise.all([
         sb.from('salas').select(COLS_SALA).eq('codigo', sala).maybeSingle(),
         sb.from('jugadores').select(COLS_JUG).eq('sala', sala).order('unido_en'),
-        sb.from('rondas').select(COLS_RON).eq('sala', sala).order('numero'),
         sb.from('decisiones').select(COLS_DEC).eq('sala', sala),
         sb.rpc('mi_jugador', { p_codigo: sala, p_jugador: jugadorId }),
       ]);
@@ -283,6 +323,7 @@
       }
       calcular();
       pintar();
+      await conducirBots();
     } catch (e) {
       aviso(mensajeError(e));
     } finally {
@@ -299,6 +340,29 @@
     if (sem.votos >= 6 || (fin && Date.now() >= fin)) {
       await sb.rpc('cerrar_ronda', { p_codigo: sala });
     }
+  }
+
+  // Envía las decisiones de esta semana de los bots que aún no decidieron.
+  // Lo hace el celular de cada persona de la sala: la decisión de un bot es una función del estado
+  // de la partida (sin azar), así que da igual cuál llegue primero. Si la semana ya cerró, se ignora.
+  async function conducirBots() {
+    if (!datos || !estado || datos.sala.estado !== 'jugando' || !datos.yo) return;
+    if (!datos.jugadores.some((j) => j.es_bot)) return;
+    const sem = datos.semana;
+    // Si lo leído quedó a medias (la semana cambió mientras se leía), se espera al próximo ciclo
+    if (!sem || sem.ronda !== actual || actual > datos.sala.total_rondas) return;
+    // Con un game.js viejo guardado en la memoria del navegador no existe la función de los bots
+    if (typeof JR.decisionBot !== 'function') {
+      aviso('Recarga la página (Ctrl+F5): el navegador mezcló versiones distintas del juego.');
+      return;
+    }
+    const p = await sb.rpc('bots_pendientes', { p_codigo: sala, p_jugador: jugadorId });
+    if (p.error || !Array.isArray(p.data)) return;
+    await Promise.all(p.data.filter((b) => b.ronda === actual).map((b) =>
+      sb.rpc('enviar_decision', {
+        p_codigo: sala, p_jugador: b.id, p_ronda: actual,
+        p_payload: JR.decisionBot(estado, b.equipo, b.rol, actual),
+      })));
   }
 
   function calcular() {
@@ -324,24 +388,30 @@
     const listo = datos.jugadores.length === 6;
     const link = `${location.origin}${location.pathname}?sala=${s.codigo}`;
     const lista = datos.jugadores.map((j) =>
-      `<li>${esc(j.nombre)}${j.es_anfitrion ? ' 👑' : ''}</li>`
+      `<li>${j.es_bot ? '🤖 ' : ''}${esc(j.nombre)}${j.es_anfitrion ? ' 👑' : ''}</li>`
     ).join('');
+    const hayBots = datos.jugadores.some((j) => j.es_bot);
+    const personas = datos.jugadores.filter((j) => !j.es_bot).length;
     render($('lobby'), `
       <p>Código de sala: <strong class="codigo">${esc(s.codigo)}</strong></p>
       <p class="ayuda">Comparte este link con tus amigos (ya trae el código):</p>
       <input class="link" readonly value="${esc(link)}" onclick="this.select()">
       <p>Semanas: <b>${s.total_rondas}</b> · Segundos por decisión: <b>${s.segundos}</b></p>
-      <p>Jugadores: <b>${datos.jugadores.length}/6</b></p>
+      <p>Jugadores: <b>${datos.jugadores.length}/6</b> (${personas} ${personas === 1 ? 'persona' : 'personas'}${hayBots ? `, ${datos.jugadores.length - personas} ${datos.jugadores.length - personas === 1 ? 'bot' : 'bots'}` : ''})</p>
       <ul class="lista">${lista}</ul>
       ${soyAnfitrion
         ? `<button class="principal" data-accion="iniciar" ${listo ? '' : 'disabled'}>
-             ${listo ? 'Iniciar partida' : 'Esperando a 6 jugadores…'}</button>`
+             ${listo ? 'Iniciar partida' : 'Esperando a 6 jugadores…'}</button>
+           ${listo ? '' : '<button class="secundario" data-accion="bots">🤖 Completar con bots los lugares vacíos</button>'}
+           ${hayBots ? '<button class="secundario" data-accion="sin-bots">Quitar los bots</button>' : ''}
+           <p class="ayuda">Si una persona entra con el código y la sala ya está llena, toma el lugar de un bot.</p>`
         : '<p class="ayuda">Esperando a que quien creó la sala inicie la partida…</p>'}
       <button class="secundario" data-accion="salir-sala">Salir de la sala</button>
       <details class="reglas" open>
         <summary>Reglas en 1 minuto</summary>
         <ul>
           <li>Cada equipo tiene fábrica → distribuidor → tienda. Cada rol decide su área.</li>
+          <li>Los bots 🤖 ocupan los lugares vacíos y deciden solos cada semana; no hacen falta 6 personas.</li>
           <li>Fábrica: calidad y producción. Distribuidor: pedidos a fábrica y pujas por influencers. Tienda: precio y pedidos al distribuidor.</li>
           <li>Hay 5 sabores. La demanda es del mercado y la comparten los dos equipos; cambia cada semana.</li>
           <li>Ganancia del equipo = ventas − costo de lo vendido − mantenimiento del stock − pujas pagadas.</li>
@@ -364,11 +434,23 @@
     $('cab').textContent = `Semana ${actual} de ${s.total_rondas} · ${EQ[yo.equipo]} · ${ROLN[yo.rol]}`;
     const ult = estado.historial[estado.historial.length - 1];
     const rep = ult ? ult.equipos[yo.equipo] : null;
-    render($('mi'), htmlMi(yo, rep));
+    render($('mi'), htmlEquipo(yo) + htmlMi(yo, rep));
     render($('inf'), htmlInf());
     render($('ult'), htmlUlt(yo, ult));
     render($('marc'), htmlMarc(yo, ult));
     actualizarTiempo();
+  }
+
+  // Quién juega cada puesto de tu equipo y del rival (los bots llevan 🤖)
+  function htmlEquipo(yo) {
+    const quien = (X) => ['fabrica', 'distribuidor', 'tienda'].map((rol) => {
+      const j = datos.jugadores.find((x) => x.equipo === X && x.rol === rol);
+      if (!j) return '';
+      const tu = X === yo.equipo && rol === yo.rol ? ' (tú)' : '';
+      return `${j.es_bot ? '🤖 ' : ''}${esc(j.nombre)}${tu} · ${ROLN[rol]}`;
+    }).filter(Boolean).join(' — ');
+    const rival = yo.equipo === 'A' ? 'B' : 'A';
+    return `<p class="ayuda"><b>${EQ[yo.equipo]}:</b> ${quien(yo.equipo)}<br><b>${EQ[rival]}:</b> ${quien(rival)}</p>`;
   }
 
   function htmlMi(yo, rep) {
@@ -592,7 +674,7 @@
     const equipos = JR.EQUIPOS.map((X) => {
       const integrantes = datos.jugadores
         .filter((j) => j.equipo === X)
-        .map((j) => `${esc(j.nombre)} <small>(${ROLN[j.rol]})</small>`).join('<br>');
+        .map((j) => `${j.es_bot ? '🤖 ' : ''}${esc(j.nombre)} <small>(${ROLN[j.rol]})</small>`).join('<br>');
       return `<div class="equipo"><h3>${EQ[X]}</h3><p>${integrantes}</p></div>`;
     }).join('');
     render($('fin'), `

@@ -1,4 +1,4 @@
-// PRUEBAS AUTOMÁTICAS DEL MOTOR (versión 3)
+// PRUEBAS AUTOMÁTICAS DEL MOTOR (versión 3.1: con bots)
 // Ejecutar con:  node test.js
 'use strict';
 const J = require('./game.js');
@@ -310,6 +310,123 @@ seccion('8. Invariantes con decisiones aleatorias');
   }
   ok(stockOk, 'stock siempre entero, no negativo y con costo válido (20 partidas)');
   ok(utilOk, 'utilidades siempre finitas (20 partidas)');
+}
+
+seccion('9. Bots');
+{
+  const rngSemana = (semilla, t) => crearRng((semilla ^ Math.imul(t, 0x9e3779b1)) >>> 0);
+  // Juega una partida; juegaBot(X) dice qué equipos los lleva el bot. Devuelve estado y las decisiones guardadas.
+  function partida(semilla, rondas, juegaBot) {
+    const e = estadoInicial();
+    const guardadas = [];
+    for (let t = 1; t <= rondas; t++) {
+      const dec = { A: {}, B: {} };
+      for (const X of J.EQUIPOS) {
+        if (!juegaBot(X)) continue;
+        for (const rol of J.ROLES) dec[X][rol] = J.decisionBot(e, X, rol, t);
+      }
+      guardadas.push(JSON.parse(JSON.stringify(dec)));          // como queda guardado en la base (jsonb)
+      avanzarRonda(e, t, dec, rngSemana(semilla, t));
+    }
+    return { e, guardadas };
+  }
+  const ambos = () => true;
+
+  // Decisiones siempre válidas y dentro de los límites
+  let validas = true, topes = true, limpias = true;
+  {
+    const e = estadoInicial();
+    for (let t = 1; t <= 30; t++) {
+      const dec = { A: {}, B: {} };
+      for (const X of J.EQUIPOS) for (const rol of J.ROLES) {
+        const p = J.decisionBot(e, X, rol, t);
+        dec[X][rol] = p;
+        const lim = leerDecision({ [rol]: p });
+        if (rol === 'fabrica') {
+          if (!p.calidad.every((c) => J.CALIDADES[c])) validas = false;
+          if (!p.produccion.every((n, i) => Number.isInteger(n) && n >= 0 && n <= PRODUCTOS[i].capProd)) topes = false;
+          if (JSON.stringify(lim.produccion) !== JSON.stringify(p.produccion)) limpias = false;
+        } else if (rol === 'distribuidor') {
+          if (!p.pedido.every((n) => Number.isInteger(n) && n >= 0 && n <= J.CONFIG.tope)) topes = false;
+          if (!p.pujas.every((x) => x === null || (Number.isInteger(x.monto) && x.monto >= 1 && x.monto <= J.CONFIG.topeMonto))) topes = false;
+          if (JSON.stringify(lim.pedidoFab) !== JSON.stringify(p.pedido)) limpias = false;
+        } else {
+          if (!p.precio.every((x) => x >= J.CONFIG.precioMin && x <= J.CONFIG.precioMax)) topes = false;
+          if (!p.pedido.every((n) => Number.isInteger(n) && n >= 0 && n <= J.CONFIG.tope)) topes = false;
+          if (JSON.stringify(lim.pedidoDist) !== JSON.stringify(p.pedido)) limpias = false;
+        }
+      }
+      avanzarRonda(e, t, dec, rngSemana(11, t));
+    }
+  }
+  ok(validas, 'los bots eligen solo calidades que existen');
+  ok(topes, 'los bots respetan capacidad de producción, tope de pedido, rango de precio y pujas de $1 a $10,000');
+  ok(limpias, 'el motor lee las decisiones de los bots tal como las enviaron (sin recortes)');
+
+  // Una misma situación da siempre la misma decisión y no se modifica el estado
+  {
+    const { e } = partida(5, 8, ambos);
+    const foto = JSON.stringify(e);
+    const d1 = JSON.stringify(J.ROLES.map((r) => J.decisionBot(e, 'A', r, 9)));
+    const d2 = JSON.stringify(J.ROLES.map((r) => J.decisionBot(e, 'A', r, 9)));
+    ok(d1 === d2, 'misma situación, misma decisión (todos los celulares coinciden)');
+    ok(JSON.stringify(e) === foto, 'decidir no modifica el estado de la partida');
+  }
+
+  // Repetir la partida con las decisiones guardadas reproduce exactamente la partida jugada
+  {
+    const { e, guardadas } = partida(321, 30, ambos);
+    const r = reproducir(321, guardadas);
+    ok(JSON.stringify(puntajes(r)) === JSON.stringify(puntajes(e)), 'la partida de bots se repite igual desde lo guardado');
+  }
+
+  // Partidas completas de 30 semanas
+  let finitos = true, enteros = true, ganaAlInactivo = 0, victoriasA = 0, ventas = 0, demanda = 0, partidas = 0;
+  for (let s = 1; s <= 40; s++) {
+    const { e } = partida(s * 7919, 30, ambos);
+    const p = puntajes(e);
+    if (!Number.isFinite(p.A) || !Number.isFinite(p.B)) finitos = false;
+    for (const X of J.EQUIPOS) for (const etapa of ['fabrica', 'distribuidor', 'tienda']) {
+      for (const L of e.equipos[X].stock[etapa]) if (!Number.isInteger(L.q) || L.q < 0) enteros = false;
+    }
+    if (p.A > p.B) victoriasA++;
+    e.historial.forEach((h) => h.equipos.A.demanda.forEach((d, i) => { demanda += d; ventas += h.equipos.A.vendido[i]; }));
+    partidas++;
+    const solo = partida(s * 7919, 30, (X) => X === 'A').e;
+    if (puntajes(solo).A > puntajes(solo).B) ganaAlInactivo++;
+  }
+  ok(finitos && enteros, '40 partidas completas de bots: utilidades finitas y stock entero y no negativo');
+  ok(ventas / demanda >= 0.9, `los bots atienden al menos 90% de la demanda (atienden ${(100 * ventas / demanda).toFixed(1)}%)`);
+  ok(ganaAlInactivo === 40, 'un equipo de bots le gana siempre a un equipo que no decide nada (40 de 40)');
+  ok(victoriasA >= 12 && victoriasA <= 28, `bots contra bots es parejo: A gana ${victoriasA} de 40`);
+
+  // Los bots no pujan por un influencer ocupado ni cuando la tienda no tiene stock
+  {
+    const { e } = partida(9, 6, ambos);
+    const t = 7;
+    const antes = J.decisionBot(e, 'A', 'distribuidor', t).pujas;
+    e.inf.A.ocupadoHasta = t + 1;
+    const ocupado = J.decisionBot(e, 'A', 'distribuidor', t).pujas;
+    ok(ocupado[0] === null && JSON.stringify(ocupado.slice(1)) === JSON.stringify(antes.slice(1)), 'no puja por un influencer ocupado');
+    e.equipos.A.stock.tienda.forEach((L) => { L.q = 0; });
+    e.equipos.A.enTransito.dt = [];
+    const sinStock = J.decisionBot(e, 'A', 'distribuidor', t).pujas;
+    ok(sinStock.every((x) => x === null), 'no puja si la tienda no tiene stock para atender más demanda');
+  }
+
+  // Un bot junto a decisiones aleatorias de otro equipo no rompe la partida
+  {
+    const e = estadoInicial();
+    const aleatorio = bot(33, 30);
+    let todoBien = true;
+    for (let t = 1; t <= 30; t++) {
+      const dec = { A: {}, B: aleatorio[t - 1].B };
+      for (const rol of J.ROLES) dec.A[rol] = J.decisionBot(e, 'A', rol, t);
+      avanzarRonda(e, t, dec, rngSemana(33, t));
+      if (!Number.isFinite(puntajes(e).A) || !Number.isFinite(puntajes(e).B)) todoBien = false;
+    }
+    ok(todoBien, 'bots contra un equipo de decisiones aleatorias: sin errores en 30 semanas');
+  }
 }
 
 console.log(`\n${pruebas - fallos} de ${pruebas} pruebas pasaron.`);
