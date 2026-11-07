@@ -1,4 +1,4 @@
-// PRUEBAS AUTOMÁTICAS DEL MOTOR (versión 3.1: con bots)
+// PRUEBAS AUTOMÁTICAS DEL MOTOR (versión 3.2: con bots)
 // Ejecutar con:  node test.js
 'use strict';
 const J = require('./game.js');

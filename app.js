@@ -1,6 +1,6 @@
 /*
-  INTERFAZ DEL JUEGO (versión 3.1: con bots)
-  Se conecta a Supabase (salas y decisiones) y usa game.js (las reglas).
+  INTERFAZ DEL JUEGO (versión 3.2: avatares, elección de puesto, cronómetro fijo, camiones)
+  Se conecta a Supabase (salas y decisiones) y usa game.js (las reglas) y avatares.js (los 20 avatares).
   Cada celular refresca cada 1.2 segundos y recalcula el estado completo.
 */
 (function () {
@@ -16,11 +16,14 @@
   const JR = window.JuegoReposicion;
   const C = window.CONFIG_SUPABASE;
   const { PRODUCTOS, CALIDADES, INFLUENCERS, INF_KEYS, CONFIG } = JR;
+  const AVATARES = window.AVATARES || [];
   const sb = window.supabase.createClient(C.url, C.anonKey);
   const app = document.getElementById('app');
 
-  const EQ = { A: 'Equipo A', B: 'Equipo B' };
+  const EQ = { A: "G'sertte", B: 'Gallecolors' };
+  const ROLES = ['fabrica', 'distribuidor', 'tienda'];
   const ROLN = { fabrica: 'Fábrica', distribuidor: 'Distribuidor', tienda: 'Tienda final' };
+  const ROLI = { fabrica: '🏭', distribuidor: '🏬', tienda: '🛍️' };
   const RES = {
     gano: '<span class="pos">✔ Ganaste</span>',
     perdio: '<span class="neg">✖ Perdiste</span>',
@@ -28,32 +31,41 @@
     sin_puja: 'No pujaste',
   };
   // Solo las columnas que la base permite leer (los ids y el anfitrión son secretos)
-  const COLS_SALA = 'codigo,estado,total_rondas,segundos,semilla,iniciada_en,creada_en';
-  const COLS_JUG = 'sala,nombre,equipo,rol,unido_en,es_anfitrion,es_bot';
+  const COLS_SALA = 'codigo,estado,total_rondas,segundos,semilla,iniciada_en,creada_en,eleccion_fin';
+  const COLS_JUG = 'sala,nombre,equipo,rol,unido_en,es_anfitrion,es_bot,avatar';
   const COLS_RON = 'sala,numero,cerrada_en';
   const COLS_DEC = 'sala,ronda,equipo,rol,payload,enviada_en';
+  const SEG_ELECCION = 120;
 
   // ---------- ESTADO LOCAL ----------
-  let jugadorId = localStorage.getItem('jugadorId');
+  const guardado = (k) => { try { return localStorage.getItem(k); } catch (e) { return null; } };
+  const guardar = (k, v) => { try { if (v === null) localStorage.removeItem(k); else localStorage.setItem(k, v); } catch (e) { /* sin almacenamiento */ } };
+  let jugadorId = guardado('jugadorId');
   if (!jugadorId) {
     jugadorId = crypto.randomUUID();
-    localStorage.setItem('jugadorId', jugadorId);
+    guardar('jugadorId', jugadorId);
   }
-  let nombre = localStorage.getItem('nombre') || '';
-  let sala = localStorage.getItem('sala') || null;
+  let nombre = guardado('nombre') || '';
+  let avatarSel = Number(guardado('avatar')) || 0;
+  let sala = guardado('sala') || null;
   const codigoUrl = (new URLSearchParams(location.search).get('sala') || '').toUpperCase();
   // Si el link trae otra sala, esa sala reemplaza a la guardada
   if (codigoUrl && codigoUrl !== sala) {
     sala = null;
-    localStorage.removeItem('sala');
+    guardar('sala', null);
   }
 
   let datos = null;     // filas de la base + datos propios del jugador
   let estado = null;    // estado del juego calculado por game.js
   let actual = 0;       // número de la semana que se está jugando
-  let pantalla = '';    // 'inicio' | 'lobby' | 'juego' | 'fin'
+  let pantalla = '';    // 'inicio' | 'lobby' | 'eleccion' | 'juego' | 'fin'
   let ocupado = false;
   let ocupadoDesde = 0;
+  let desfase = 0;      // hora del servidor − hora de este celular (para que el cronómetro coincida)
+  let autoRonda = 0;    // semana en la que ya se envió automáticamente
+  let semanaVista = 0;  // última semana que se pintó (para animar el cambio de semana)
+  let semanaCadena = 0;
+  const camiones = new Map();
 
   // ---------- UTILIDADES ----------
   const $ = (id) => document.getElementById(id);
@@ -64,6 +76,8 @@
   const dinero2 = (n) => '$' + Number(n).toFixed(2);
   const num = (n) => Math.round(n).toLocaleString('es-PE');
   const pct = (x) => Math.round(x * 100) + '%';
+  const suma = (arr) => arr.reduce((a, b) => a + b, 0);
+  const ahoraServidor = () => Date.now() + desfase;
   const chip = (p) => `<span class="chip" style="background:${p.color}"></span>${esc(p.nombre)}`;
   const render = (el, html) => {
     if (!el) return;
@@ -76,7 +90,7 @@
       return 'Sin conexión, reintentando… (revisa tu internet y config.js)';
     }
     // Se subieron los archivos nuevos pero falta pegar el supabase.sql nuevo en Supabase
-    if (/could not find the function|schema cache|es_bot/i.test(m)) {
+    if (/could not find the function|schema cache|column [\w."]+ does not exist|es_bot/i.test(m)) {
       return 'Falta actualizar la base de datos: pega de nuevo todo supabase.sql en Supabase > SQL Editor > Run (ver GUIA.md).';
     }
     return m;
@@ -85,14 +99,14 @@
     `<div class="scroll"><table class="${clase}"><thead><tr>${cab.map((h) => `<th>${h}</th>`).join('')}</tr></thead>` +
     `<tbody>${filas.map((f) => `<tr>${f.map((c) => `<td>${c}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
 
-  function finRonda(r) {
-    const s = datos.sala;
-    const inicio = r === 1
-      ? new Date(s.iniciada_en).getTime()
-      : new Date((datos.rondas.find((x) => x.numero === r - 1) || {}).cerrada_en).getTime();
-    if (!inicio || isNaN(inicio)) return null;
-    return inicio + s.segundos * 1000;
+  // Avatar: cara + número (o imagen si en avatares.js se puso una)
+  function avatar(id, tam = '') {
+    const a = AVATARES.find((x) => x.id === Number(id));
+    if (!a) return `<span class="av ${tam}">?</span>`;
+    const cuerpo = a.img ? `<img src="${esc(a.img)}" alt="">` : a.cara;
+    return `<span class="av ${tam}">${cuerpo}<i>${a.id}</i></span>`;
   }
+  const quienHtml = (j) => `${avatar(j.avatar, 'peq')} <b>${esc(j.nombre)}</b>${j.es_bot ? ' 🤖' : ''}`;
 
   // ---------- PANTALLAS ----------
   const PLANTILLAS = {
@@ -100,10 +114,18 @@
       <section class="card">
         <h1>Juego de Reposición</h1>
         <p class="ayuda">Fábrica, distribuidor y tienda, en 2 equipos de 3. Gana quien tenga más utilidad al final.</p>
-        <label>Tu nombre
-          <input id="nombre" value="${esc(nombre)}" maxlength="20" autocomplete="off">
-        </label>
-        <h2>Crear sala nueva</h2>
+        <h2>1. Elige tu avatar</h2>
+        <div class="grid-av" id="grid-av">
+          ${AVATARES.map((a) => `<button type="button" class="av-btn ${a.id === avatarSel ? 'sel' : ''}" data-accion="avatar" data-id="${a.id}" aria-label="Avatar ${a.id}">${avatar(a.id)}</button>`).join('')}
+        </div>
+        <div id="perfil" class="perfil" ${avatarSel ? '' : 'hidden'}>
+          <div id="av-grande">${avatarSel ? avatar(avatarSel, 'grande') : ''}</div>
+          <label>Tu nombre
+            <input id="nombre" value="${esc(nombre)}" maxlength="20" autocomplete="off" placeholder="Escribe tu nombre">
+          </label>
+        </div>
+        <p class="ayuda" id="pide-av" ${avatarSel ? 'hidden' : ''}>Toca uno de los 20 avatares para empezar.</p>
+        <h2>2. Crea una sala o únete</h2>
         <div class="fila">
           <label>Semanas (5 a 60)
             <input id="rondas" type="number" value="30" min="5" max="60" inputmode="numeric">
@@ -113,8 +135,7 @@
           </label>
         </div>
         <button class="principal" data-accion="crear">Crear sala</button>
-        <button class="secundario" data-accion="solo">🤖 Probar solo con 5 bots (empieza al instante)</button>
-        <h2>Unirse a una sala</h2>
+        <button class="secundario" data-accion="solo">🤖 Probar solo con 5 bots</button>
         <label>Código de sala (4 letras o números)
           <input id="codigo" value="${esc(codigoUrl)}" maxlength="4" autocapitalize="characters" autocomplete="off">
         </label>
@@ -127,12 +148,30 @@
         <div id="lobby"></div>
         <p id="aviso" class="aviso"></p>
       </section>`,
+    eleccion: () => `
+      <section class="card">
+        <h1>Elige tu equipo y tu puesto</h1>
+        <div id="elec"></div>
+        <p id="aviso" class="aviso"></p>
+      </section>`,
     juego: () => `
-      <header class="barra">
-        <strong id="cab"></strong>
-        <span id="tiempo" class="tiempo"></span>
-      </header>
       <p id="aviso" class="aviso"></p>
+      <section class="card" id="dinero"></section>
+      <section class="card">
+        <h2>🚚 Tu cadena</h2>
+        <div class="cadena" id="cadena">
+          <div class="nodo"><span class="ic">⚙️</span><div class="ni"><b>Producción</b> <small id="t-prod"></small></div></div>
+          <div class="lane" id="lane-prod"></div>
+          <div class="nodo" id="n-fabrica"><span class="ic">🏭</span><div class="ni" id="i-fabrica"></div></div>
+          <div class="lane" id="lane-fd"></div>
+          <div class="nodo" id="n-distribuidor"><span class="ic">🏬</span><div class="ni" id="i-distribuidor"></div></div>
+          <div class="lane" id="lane-dt"></div>
+          <div class="nodo" id="n-tienda"><span class="ic">🛍️</span><div class="ni" id="i-tienda"></div></div>
+          <div class="lane fija"><span id="t-ventas"></span></div>
+          <div class="nodo"><span class="ic">🙋</span><div class="ni"><b>Clientes</b></div></div>
+        </div>
+        <p class="ayuda" id="rival-est"></p>
+      </section>
       <section class="card" id="mi"></section>
       <section class="card" id="inf"></section>
       <section class="card" id="ult"></section>
@@ -143,13 +182,15 @@
   function construir(p) {
     pantalla = p;
     app.innerHTML = PLANTILLAS[p]();
+    camiones.clear();
+    semanaCadena = 0;
   }
 
   // ---------- ACCIONES ----------
   function entrar(codigo) {
     sala = codigo;
-    localStorage.setItem('sala', codigo);
-    localStorage.setItem('nombre', nombre);
+    guardar('sala', codigo);
+    guardar('nombre', nombre);
     datos = null;
     pantalla = '';
     refrescar();
@@ -159,25 +200,48 @@
     sala = null;
     datos = null;
     estado = null;
-    localStorage.removeItem('sala');
+    guardar('sala', null);
     pantalla = '';
+    semanaVista = 0;
     construir('inicio');
   }
 
-  async function crearSala() {
+  // Lee y comprueba el avatar y el nombre de la pantalla de inicio
+  function perfilListo() {
     nombre = val('nombre').trim();
+    if (!avatarSel) { aviso('Primero elige tu avatar'); return false; }
+    if (!nombre) { aviso('Escribe tu nombre'); return false; }
+    guardar('nombre', nombre);
+    return true;
+  }
+
+  function elegirAvatar(id) {
+    avatarSel = id;
+    guardar('avatar', String(id));
+    document.querySelectorAll('#grid-av .av-btn').forEach((b) => b.classList.toggle('sel', Number(b.dataset.id) === id));
+    const g = $('av-grande'); if (g) g.innerHTML = avatar(id, 'grande');
+    const p = $('perfil'); if (p) p.hidden = false;
+    const m = $('pide-av'); if (m) m.hidden = true;
+    aviso('');
+    const n = $('nombre'); if (n && !n.value) n.focus();
+  }
+
+  async function crearSala() {
+    if (!perfilListo()) return;
     const { data, error } = await sb.rpc('crear_sala', {
       p_nombre: nombre, p_jugador: jugadorId, p_rondas: Number(val('rondas')), p_segundos: Number(val('segundos')),
+      p_avatar: avatarSel,
     });
     if (error) return aviso(mensajeError(error));
     entrar(data);
   }
 
-  // Crea una sala, la llena con 5 bots y empieza la partida (para probar sin otras personas)
+  // Crea una sala, la llena con 5 bots y abre la elección de puesto (para probar sin otras personas)
   async function jugarSolo() {
-    nombre = val('nombre').trim();
+    if (!perfilListo()) return;
     const crear = await sb.rpc('crear_sala', {
       p_nombre: nombre, p_jugador: jugadorId, p_rondas: Number(val('rondas')), p_segundos: Number(val('segundos')),
+      p_avatar: avatarSel,
     });
     if (crear.error) return aviso(mensajeError(crear.error));
     const codigo = crear.data;
@@ -187,7 +251,10 @@
       return aviso(mensajeError(bots.error));
     }
     const ini = await sb.rpc('iniciar_sala', { p_codigo: codigo, p_jugador: jugadorId });
-    if (ini.error) return aviso(mensajeError(ini.error));
+    if (ini.error) {
+      await sb.rpc('salir_sala', { p_codigo: codigo, p_jugador: jugadorId });
+      return aviso(mensajeError(ini.error));
+    }
     entrar(codigo);
   }
 
@@ -204,10 +271,10 @@
   }
 
   async function unirse() {
-    nombre = val('nombre').trim();
+    if (!perfilListo()) return;
     const codigo = val('codigo').trim().toUpperCase();
     if (!codigo) return aviso('Escribe el código de la sala');
-    const { error } = await sb.rpc('unirse_sala', { p_codigo: codigo, p_jugador: jugadorId, p_nombre: nombre });
+    const { error } = await sb.rpc('unirse_sala', { p_codigo: codigo, p_jugador: jugadorId, p_nombre: nombre, p_avatar: avatarSel });
     if (error) return aviso(mensajeError(error));
     entrar(codigo);
   }
@@ -215,6 +282,18 @@
   async function iniciar() {
     const { error } = await sb.rpc('iniciar_sala', { p_codigo: sala, p_jugador: jugadorId });
     if (error) return aviso(mensajeError(error));
+    refrescar();
+  }
+
+  async function elegirPuesto(equipo, rol) {
+    const { error } = await sb.rpc('elegir_puesto', { p_codigo: sala, p_jugador: jugadorId, p_equipo: equipo, p_rol: rol });
+    aviso(error ? mensajeError(error) : '');
+    refrescar();
+  }
+
+  async function liberarPuesto() {
+    const { error } = await sb.rpc('liberar_puesto', { p_codigo: sala, p_jugador: jugadorId });
+    if (error) aviso(mensajeError(error));
     refrescar();
   }
 
@@ -256,15 +335,16 @@
     };
   }
 
-  async function enviarDec() {
+  async function enviarDec(auto) {
     const yo = datos && datos.yo;
-    if (!yo || !yo.rol) return;
+    if (!yo || !yo.rol || !estado || !document.querySelector('#mi [data-accion="enviar-dec"]')) return false;
     const { error } = await sb.rpc('enviar_decision', {
       p_codigo: sala, p_jugador: jugadorId, p_ronda: actual, p_payload: leerFormulario(yo.rol),
     });
-    if (error) return aviso(mensajeError(error));
-    aviso('✔ Decisión enviada');
+    if (error) { aviso(mensajeError(error)); return false; }
+    aviso(auto ? '⏱ Se acabó el tiempo: enviamos automáticamente lo que tenías en pantalla.' : '✔ Decisión enviada');
     refrescar();
+    return true;
   }
 
   document.addEventListener('click', async (ev) => {
@@ -272,18 +352,26 @@
     if (!b) return;
     try {
       const a = b.dataset.accion;
-      if (a === 'crear') await crearSala();
+      if (a === 'avatar') elegirAvatar(Number(b.dataset.id));
+      else if (a === 'crear') await crearSala();
       else if (a === 'solo') await jugarSolo();
       else if (a === 'bots') await completarBots();
       else if (a === 'sin-bots') await quitarBots();
       else if (a === 'unirse') await unirse();
       else if (a === 'iniciar') await iniciar();
-      else if (a === 'enviar-dec') await enviarDec();
+      else if (a === 'puesto') await elegirPuesto(b.dataset.eq, b.dataset.rol);
+      else if (a === 'liberar') await liberarPuesto();
+      else if (a === 'enviar-dec') await enviarDec(false);
       else if (a === 'salir-sala') await salirDeSala();
       else if (a === 'salir') salir();
     } catch (e) {
       aviso(mensajeError(e));
     }
+  });
+
+  // Estimaciones en vivo mientras se escribe en el formulario
+  document.addEventListener('input', (ev) => {
+    if (ev.target.closest && ev.target.closest('#mi')) actualizarEstimado();
   });
 
   // ---------- LECTURA Y CIERRE DE SEMANAS ----------
@@ -314,7 +402,12 @@
       const sem = await sb.rpc('estado_semana', { p_codigo: sala });
       if (sem.error) throw new Error(sem.error.message);
       datos.semana = sem.data;
-      await intentarCerrar(sem.data);
+      if (sem.data && sem.data.ahora) {
+        const t = Date.parse(sem.data.ahora);
+        if (!isNaN(t)) desfase = t - Date.now();
+      }
+      if (datos.sala.estado === 'eleccion') await intentarCerrarEleccion();
+      else await intentarCerrar(sem.data);
 
       if (datos.sala.estado === 'jugando' && sem.data) {
         const md = await sb.rpc('mi_decision', { p_codigo: sala, p_jugador: jugadorId, p_ronda: sem.data.ronda });
@@ -337,8 +430,18 @@
     if (!sem || datos.sala.estado !== 'jugando') return;
     if (sem.ronda > sem.total) return;
     const fin = sem.fin ? new Date(sem.fin).getTime() : null;
-    if (sem.votos >= 6 || (fin && Date.now() >= fin)) {
+    if (sem.votos >= 6 || (fin && ahoraServidor() >= fin)) {
       await sb.rpc('cerrar_ronda', { p_codigo: sala });
+    }
+  }
+
+  // Cierra la elección de puestos al acabar los 2 minutos o cuando todas las personas ya eligieron
+  async function intentarCerrarEleccion() {
+    const fin = datos.sala.eleccion_fin ? new Date(datos.sala.eleccion_fin).getTime() : null;
+    const personas = datos.jugadores.filter((j) => !j.es_bot);
+    const todas = personas.length > 0 && personas.every((j) => j.equipo && j.rol);
+    if (todas || (fin && ahoraServidor() >= fin)) {
+      await sb.rpc('cerrar_eleccion', { p_codigo: sala });
     }
   }
 
@@ -376,6 +479,7 @@
   function pintar() {
     const s = datos.sala;
     if (s.estado === 'espera') return pintarLobby();
+    if (s.estado === 'eleccion') return pintarEleccion();
     if (s.estado === 'terminado') return pintarFin();
     return pintarJuego();
   }
@@ -388,7 +492,7 @@
     const listo = datos.jugadores.length === 6;
     const link = `${location.origin}${location.pathname}?sala=${s.codigo}`;
     const lista = datos.jugadores.map((j) =>
-      `<li>${j.es_bot ? '🤖 ' : ''}${esc(j.nombre)}${j.es_anfitrion ? ' 👑' : ''}</li>`
+      `<li>${quienHtml(j)}${j.es_anfitrion ? ' 👑' : ''}</li>`
     ).join('');
     const hayBots = datos.jugadores.some((j) => j.es_bot);
     const personas = datos.jugadores.filter((j) => !j.es_bot).length;
@@ -398,13 +502,13 @@
       <input class="link" readonly value="${esc(link)}" onclick="this.select()">
       <p>Semanas: <b>${s.total_rondas}</b> · Segundos por decisión: <b>${s.segundos}</b></p>
       <p>Jugadores: <b>${datos.jugadores.length}/6</b> (${personas} ${personas === 1 ? 'persona' : 'personas'}${hayBots ? `, ${datos.jugadores.length - personas} ${datos.jugadores.length - personas === 1 ? 'bot' : 'bots'}` : ''})</p>
-      <ul class="lista">${lista}</ul>
+      <ul class="lista sin-punto">${lista}</ul>
       ${soyAnfitrion
         ? `<button class="principal" data-accion="iniciar" ${listo ? '' : 'disabled'}>
-             ${listo ? 'Iniciar partida' : 'Esperando a 6 jugadores…'}</button>
+             ${listo ? 'Iniciar: elegir puestos (2 min)' : 'Esperando a 6 jugadores…'}</button>
            ${listo ? '' : '<button class="secundario" data-accion="bots">🤖 Completar con bots los lugares vacíos</button>'}
            ${hayBots ? '<button class="secundario" data-accion="sin-bots">Quitar los bots</button>' : ''}
-           <p class="ayuda">Si una persona entra con el código y la sala ya está llena, toma el lugar de un bot.</p>`
+           <p class="ayuda">Al iniciar, cada persona tendrá 2 minutos para elegir su equipo (${esc(EQ.A)} o ${esc(EQ.B)}) y su puesto. Quien no elija recibe uno al azar.</p>`
         : '<p class="ayuda">Esperando a que quien creó la sala inicie la partida…</p>'}
       <button class="secundario" data-accion="salir-sala">Salir de la sala</button>
       <details class="reglas" open>
@@ -415,6 +519,7 @@
           <li>Fábrica: calidad y producción. Distribuidor: pedidos a fábrica y pujas por influencers. Tienda: precio y pedidos al distribuidor.</li>
           <li>Hay 5 sabores. La demanda es del mercado y la comparten los dos equipos; cambia cada semana.</li>
           <li>Ganancia del equipo = ventas − costo de lo vendido − mantenimiento del stock − pujas pagadas.</li>
+          <li>Si no envías tu decisión antes de que acabe el tiempo, se envía sola lo que tengas en pantalla.</li>
           <li>Influencers (opcionales): suben la demanda de todos los sabores de su equipo. Las pujas son secretas: gana el monto más alto y paga ese monto. Si hay empate, gana el equipo con mejor calidad.</li>
         </ul>
       </details>
@@ -422,59 +527,215 @@
     `);
   }
 
+  // ---------- ELECCIÓN DE PUESTO ----------
+  function pintarEleccion() {
+    if (pantalla !== 'eleccion') construir('eleccion');
+    const yo = datos.yo;
+    const miEq = yo && yo.equipo;
+    const columnas = ['A', 'B'].map((X) => {
+      const filas = ROLES.map((rol) => {
+        const j = datos.jugadores.find((x) => x.equipo === X && x.rol === rol);
+        const mio = !!(yo && yo.equipo === X && yo.rol === rol);
+        let cuerpo;
+        if (mio) {
+          cuerpo = `${avatar(yo.avatar, 'peq')} <b>${esc(yo.nombre)}</b> (tú) 🔒
+            <button class="mini sec" data-accion="liberar">Desbloquear para cambiar</button>`;
+        } else if (j) {
+          cuerpo = miEq === X ? `${avatar(j.avatar, 'peq')} ${esc(j.nombre)} 🔒` : '🔒 Ocupado';
+        } else {
+          cuerpo = `<button class="mini" data-accion="puesto" data-eq="${X}" data-rol="${rol}">Elegir este puesto</button>`;
+        }
+        return `<div class="slot ${mio ? 'mio' : ''} ${j ? 'ocup' : ''}"><span class="rolnom">${ROLI[rol]} ${ROLN[rol]}</span><div>${cuerpo}</div></div>`;
+      }).join('');
+      return `<div class="colEq ${miEq === X ? 'miEq' : ''}"><h3>${esc(EQ[X])}${miEq === X ? ' (tu equipo)' : ''}</h3>${filas}</div>`;
+    }).join('');
+    const sinElegir = datos.jugadores.filter((j) => !j.es_bot && !j.equipo);
+    const bots = datos.jugadores.filter((j) => j.es_bot).length;
+    render($('elec'), `
+      <p class="ayuda">Elige tu equipo y tu puesto. <b>El primero en confirmar un puesto lo bloquea</b> para los demás, pero puedes desbloquearlo para cambiar.
+      Si se acaba el tiempo y no elegiste, te toca un puesto al azar.</p>
+      <div class="dos-col">${columnas}</div>
+      <p>${sinElegir.length
+        ? `Faltan por elegir: ${sinElegir.map((j) => `${avatar(j.avatar, 'peq')} ${esc(j.nombre)}`).join(', ')}`
+        : '✔ Todas las personas ya eligieron. La partida empieza en unos segundos…'}</p>
+      ${bots ? `<p class="ayuda">🤖 ${bots} ${bots === 1 ? 'bot recibirá' : 'bots recibirán'} al azar los puestos que queden libres.</p>` : ''}
+    `);
+    tick();
+  }
+
   // ---------- JUEGO ----------
   function pintarJuego() {
     if (pantalla !== 'juego') construir('juego');
     const s = datos.sala;
     const yo = datos.yo;
-    if (!yo) {
+    if (!yo || !yo.rol) {
       render($('mi'), '<p>No apareces en esta sala.</p><button class="secundario" data-accion="salir">Volver al inicio</button>');
       return;
     }
-    $('cab').textContent = `Semana ${actual} de ${s.total_rondas} · ${EQ[yo.equipo]} · ${ROLN[yo.rol]}`;
+    const nueva = semanaVista > 0 && actual > semanaVista;
+    semanaVista = actual;
     const ult = estado.historial[estado.historial.length - 1];
     const rep = ult ? ult.equipos[yo.equipo] : null;
-    render($('mi'), htmlEquipo(yo) + htmlMi(yo, rep));
+    render($('dinero'), htmlDinero(yo, ult));
+    actualizarCadena(yo, ult, nueva);
+    render($('mi'), htmlMi(yo, rep));
+    actualizarEstimado();
     render($('inf'), htmlInf());
     render($('ult'), htmlUlt(yo, ult));
     render($('marc'), htmlMarc(yo, ult));
-    actualizarTiempo();
+    if (nueva) {
+      aviso('');
+      avisoSemana(`📅 Semana ${actual} · los camiones avanzan`);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+    tick();
   }
 
-  // Quién juega cada puesto de tu equipo y del rival (los bots llevan 🤖)
-  function htmlEquipo(yo) {
-    const quien = (X) => ['fabrica', 'distribuidor', 'tienda'].map((rol) => {
+  function avisoSemana(texto) {
+    const t = $('toast');
+    if (!t) return;
+    t.textContent = texto;
+    t.classList.add('ver');
+    clearTimeout(avisoSemana.h);
+    avisoSemana.h = setTimeout(() => t.classList.remove('ver'), 2600);
+  }
+
+  // 💰 Cuánto dinero tiene el equipo y de dónde sale
+  function htmlDinero(yo, ult) {
+    const X = yo.equipo;
+    const R = X === 'A' ? 'B' : 'A';
+    const u = estado.equipos[X].utilidad;
+    const total = JR.sumaUtil(u);
+    const totalR = JR.sumaUtil(estado.equipos[R].utilidad);
+    const semana = ult ? ult.equipos[X].utilidadRonda : null;
+    const dif = total - totalR;
+    return `
+      <h2>💰 Dinero de ${esc(EQ[X])}</h2>
+      <div class="dinero">
+        <span class="gran ${total >= 0 ? 'pos' : 'neg'}">${money(total)}</span>
+        <small>ganancia acumulada de tu equipo</small>
+      </div>
+      <p>${semana
+        ? `Última semana: <b class="${semana.total >= 0 ? 'pos' : 'neg'}">${money(semana.total)}</b> <small>(ventas ${money(semana.ventas)} − mantenimiento ${money(semana.mantenimiento)} − pujas ${money(semana.influencers)})</small>`
+        : 'Todavía no se cerró ninguna semana: empiezan en $0.'}</p>
+      <p>${esc(EQ[R])}: <b>${money(totalR)}</b> · ${dif === 0 ? 'van empatados' : dif > 0 ? `<span class="pos">vas ganando por ${money(dif)}</span>` : `<span class="neg">vas perdiendo por ${money(-dif)}</span>`}</p>
+      <details class="reglas">
+        <summary>¿Cómo funciona el dinero?</summary>
+        <ul>
+          <li>Empiezan en $0 y <b>no hay límite de caja</b>: puedes pedir y producir lo que quieras.</li>
+          <li><b>Producir o pedir no cuesta en el momento.</b> El costo de cada galleta se descuenta cuando se vende.</li>
+          <li>Lo que se vende suma: precio − costo de la galleta (es el "margen de ventas").</li>
+          <li>Lo guardado en almacén paga mantenimiento: 3% de su valor por semana (por eso conviene no acumular de más).</li>
+          <li>Las pujas por influencers solo se pagan si ganas, y se descuentan de tu ganancia.</li>
+          <li>Gana el equipo con más ganancia acumulada al final.</li>
+        </ul>
+      </details>`;
+  }
+
+  // ---------- CADENA ANIMADA ----------
+  const remDe = (e) => Math.min(1, Math.max(0, e.llega - actual));
+
+  function actualizarCadena(yo, ult, animar) {
+    const X = yo.equipo;
+    const eq = estado.equipos[X];
+    const listos = new Set((datos.semana && datos.semana.listos) || []);
+    const rep = ult ? ult.equipos[X] : null;
+
+    // Quién es quién en MI equipo (nombre y avatar). Del rival no se muestra el puesto.
+    ROLES.forEach((rol) => {
       const j = datos.jugadores.find((x) => x.equipo === X && x.rol === rol);
-      if (!j) return '';
-      const tu = X === yo.equipo && rol === yo.rol ? ' (tú)' : '';
-      return `${j.es_bot ? '🤖 ' : ''}${esc(j.nombre)}${tu} · ${ROLN[rol]}`;
-    }).filter(Boolean).join(' — ');
-    const rival = yo.equipo === 'A' ? 'B' : 'A';
-    return `<p class="ayuda"><b>${EQ[yo.equipo]}:</b> ${quien(yo.equipo)}<br><b>${EQ[rival]}:</b> ${quien(rival)}</p>`;
+      const decidio = listos.has(`${X}:${rol}`);
+      const stk = suma(eq.stock[rol].map((L) => L.q));
+      render($('i-' + rol), `
+        <b>${ROLN[rol]}</b> ${j ? quienHtml(j) : ''}${rol === yo.rol ? ' <span class="tu">TÚ</span>' : ''}
+        <br><small>Almacén: <b>${num(stk)}</b> galletas · ${decidio ? '<span class="pos">✔ ya decidió</span>' : '⏳ decidiendo…'}</small>`);
+      const n = $('n-' + rol);
+      if (n) n.classList.toggle('mio', rol === yo.rol);
+    });
+    const enProd = suma(eq.enTransito.prod.map((e) => e.q));
+    const t1 = $('t-prod'); if (t1) t1.textContent = `${num(enProd)} galletas en proceso`;
+    const t2 = $('t-ventas');
+    if (t2) t2.textContent = rep ? `🛒 Semana pasada: vendió ${num(suma(rep.vendido))} de ${num(suma(rep.demanda))} pedidas` : '🛒 Aquí verás las ventas';
+    const R = X === 'A' ? 'B' : 'A';
+    const rivalListos = [...listos].filter((k) => k.startsWith(R + ':')).length;
+    const r = $('rival-est');
+    if (r) r.textContent = `${EQ[R]}: ${rivalListos} de 3 ya decidieron esta semana.`;
+
+    // Camiones: uno por cada envío (agrupados por semana de llegada)
+    const vistos = new Set();
+    [['prod', 'lane-prod'], ['fd', 'lane-fd'], ['dt', 'lane-dt']].forEach(([clave, laneId]) => {
+      const lane = $(laneId);
+      if (!lane) return;
+      const grupos = {};
+      eq.enTransito[clave].forEach((e) => {
+        if (e.q <= 0) return;
+        const k = `${clave}|${e.llega}`;
+        grupos[k] = grupos[k] || { q: 0, r: remDe(e) };
+        grupos[k].q += e.q;
+      });
+      Object.keys(grupos).forEach((k) => {
+        const g = grupos[k];
+        const pos = g.r === 0 ? 72 : 30;
+        vistos.add(k);
+        let el = camiones.get(k);
+        if (!el) {
+          el = document.createElement('div');
+          el.className = 'camion';
+          el.innerHTML = '<span class="cm">🚚</span><small></small>';
+          el.style.top = (animar ? 0 : pos) + '%';
+          if (animar) el.style.opacity = '0';
+          lane.appendChild(el);
+          camiones.set(k, el);
+          if (animar) {
+            void el.offsetWidth;
+            el.style.top = pos + '%';
+            el.style.opacity = '1';
+          }
+        } else {
+          el.style.top = pos + '%';
+        }
+        el.querySelector('small').textContent =
+          `${num(g.q)} · ${g.r === 0 ? 'llega al cerrar esta semana' : 'llega al cerrar la próxima'}`;
+      });
+    });
+    [...camiones.keys()].forEach((k) => {
+      if (vistos.has(k)) return;
+      const el = camiones.get(k);
+      camiones.delete(k);
+      if (animar) {
+        el.style.top = '100%';
+        el.style.opacity = '0';
+        setTimeout(() => el.remove(), 1500);
+      } else {
+        el.remove();
+      }
+    });
   }
 
+  // ---------- TU DECISIÓN ----------
   function htmlMi(yo, rep) {
     const eq = estado.equipos[yo.equipo];
     const pl = datos.miDec || {};
     const enviada = datos.miDec !== null;
     // Valores ya limpiados por el motor, para mostrar lo que realmente se usará
     const lim = JR.leerDecision({ [yo.rol]: pl });
-    const enCamino = (clave) => PRODUCTOS.map((_, i) =>
-      eq.enTransito[clave].filter((e) => e.p === i).reduce((a, e) => a + e.q, 0));
+    const cam = (clave, i, r) => suma(eq.enTransito[clave].filter((e) => e.p === i && remDe(e) === r).map((e) => e.q));
+    const camTot = (clave, i) => cam(clave, i, 0) + cam(clave, i, 1);
+    const dosSemanas = (clave, i) => `${num(cam(clave, i, 0))} <small>al cerrar esta semana</small><br>${num(cam(clave, i, 1))} <small>al cerrar la próxima</small>`;
     const stock = eq.stock[yo.rol].map((L) => L.q);
     const boton = `<button class="principal" data-accion="enviar-dec">${enviada ? 'Actualizar decisión' : 'Enviar decisión'}</button>`;
     const estadoEnvio = `<p class="estado">${enviada
-      ? '✔ Decisión enviada. Puedes cambiarla hasta que acabe el tiempo.'
-      : 'Aún no envías tu decisión.'}</p>`;
+      ? '✔ Decisión enviada. Puedes cambiarla mientras la semana siga abierta (se cierra cuando deciden los 6 o se acaba el tiempo).'
+      : 'Aún no envías tu decisión. Si se acaba el tiempo, se enviará sola lo que tengas aquí.'}</p>`;
+    const estim = '<p class="estim" id="estim"></p>';
 
     if (yo.rol === 'fabrica') {
       const sugerido = (i) => (rep ? rep.pedidoFab[i] : Math.round(PRODUCTOS[i].demMedia));
       const pCal = (i) => lim.calidad[i] || eq.calidad[i];
       const pProd = (i) => (pl.produccion !== undefined ? lim.produccion[i] : sugerido(i));
-      const camino = enCamino('prod');
-      const tablaStock = tabla(
-        ['Sabor', 'Stock terminado', 'En producción', 'Calidad actual'],
-        PRODUCTOS.map((p, i) => [chip(p), num(stock[i]), num(camino[i]), CALIDADES[eq.calidad[i]].nombre])
+      const situacion = tabla(
+        ['Sabor', '📦 En almacén', '⚙️ Produciendo', '🚚 Entregando al distribuidor'],
+        PRODUCTOS.map((p, i) => [chip(p), num(stock[i]), dosSemanas('prod', i), dosSemanas('fd', i)])
       );
       const formulario = tabla(
         ['Sabor', 'Calidad', 'Producir (llega en 2 semanas)'],
@@ -487,29 +748,29 @@
         'form'
       );
       const ultima = rep
-        ? `<h3>Lo que pasó la semana pasada</h3>` + tabla(
-            ['Sabor', 'Pedido del distribuidor', 'Producido', 'Despachado al distribuidor'],
-            PRODUCTOS.map((p, i) => [chip(p), num(rep.pedidoFab[i]), num(rep.produccion[i]), num(rep.despFD[i])]))
-        : '<p class="ayuda">Aquí verás lo que pasó cuando termine la primera semana.</p>';
+        ? `<h3>🤝 Con el distribuidor (semana pasada)</h3>` + tabla(
+            ['Sabor', 'Te pidió', 'Despachaste', 'Produjiste'],
+            PRODUCTOS.map((p, i) => [chip(p), num(rep.pedidoFab[i]), num(rep.despFD[i]), num(rep.produccion[i])]))
+        : '<p class="ayuda">Aquí verás lo que pidió el distribuidor cuando termine la primera semana.</p>';
       return `
         <h2>Tu decisión · Fábrica</h2>
-        <p class="ayuda">Decides la calidad de cada sabor y cuánto producir. Lo que produces llega a tu stock en 2 semanas. Cada galleta paga su costo cuando se vende.</p>
-        <h3>Tu stock</h3>
-        ${tablaStock}
+        <p class="ayuda">Decides la calidad de cada sabor y cuánto producir. Lo que produces llega a tu almacén en 2 semanas.</p>
+        <h3>Tu situación ahora</h3>
+        ${situacion}
         ${ultima}
         <h3>Decide esta semana</h3>
         <p class="ayuda">Te sugerimos producir lo que pidió el distribuidor la semana pasada. Puedes cambiarlo.</p>
         ${formulario}
+        ${estim}
         ${boton}${estadoEnvio}`;
     }
 
     if (yo.rol === 'distribuidor') {
       const sugerido = (i) => (rep ? rep.pedidoDist[i] : Math.round(PRODUCTOS[i].demMedia));
       const pPed = (i) => (pl.pedido !== undefined ? lim.pedidoFab[i] : sugerido(i));
-      const camino = enCamino('fd');
-      const tablaStock = tabla(
-        ['Sabor', 'Stock', 'Llegando de fábrica'],
-        PRODUCTOS.map((p, i) => [chip(p), num(stock[i]), num(camino[i])])
+      const situacion = tabla(
+        ['Sabor', '📦 En almacén', '⏳ Esperando de fábrica', '🚚 Entregando a la tienda'],
+        PRODUCTOS.map((p, i) => [chip(p), num(stock[i]), dosSemanas('fd', i), dosSemanas('dt', i)])
       );
       const formulario = tabla(
         ['Sabor', 'Pedir a fábrica (llega en 2 semanas)'],
@@ -520,29 +781,29 @@
         'form'
       );
       const ultima = rep
-        ? `<h3>Lo que pasó la semana pasada</h3>` + tabla(
-            ['Sabor', 'Pedido de la tienda', 'Despachado a la tienda', 'Tu pedido a fábrica', 'Despachado por fábrica'],
+        ? `<h3>🤝 Con la tienda y la fábrica (semana pasada)</h3>` + tabla(
+            ['Sabor', 'La tienda te pidió', 'Le despachaste', 'Tú pediste a fábrica', 'Fábrica despachó'],
             PRODUCTOS.map((p, i) => [chip(p), num(rep.pedidoDist[i]), num(rep.despDT[i]), num(rep.pedidoFab[i]), num(rep.despFD[i])]))
         : '';
       return `
         <h2>Tu decisión · Distribuidor</h2>
-        <p class="ayuda">Decides cuánto pedir a fábrica y pujas por los influencers. Lo que pida la tienda sale de tu stock.</p>
-        <h3>Tu stock</h3>
-        ${tablaStock}
+        <p class="ayuda">Decides cuánto pedir a fábrica y pujas por los influencers. Lo que pida la tienda sale de tu almacén.</p>
+        <h3>Tu situación ahora</h3>
+        ${situacion}
         ${ultima}
         <h3>Pedido a fábrica</h3>
         ${formulario}
         ${htmlSubasta(lim)}
+        ${estim}
         ${boton}${estadoEnvio}`;
     }
 
     // tienda
     const pPre = (i) => (lim.precio[i] !== null ? lim.precio[i] : eq.precio[i]);
     const pPedT = (i) => (pl.pedido !== undefined ? lim.pedidoDist[i] : (rep ? rep.demanda[i] : Math.round(PRODUCTOS[i].demMedia)));
-    const camino = enCamino('dt');
-    const tablaStock = tabla(
-      ['Sabor', 'Stock', 'Llegando del distribuidor', 'Precio actual'],
-      PRODUCTOS.map((p, i) => [chip(p), num(stock[i]), num(camino[i]), dinero2(eq.precio[i])])
+    const situacion = tabla(
+      ['Sabor', '📦 En almacén', '⏳ Esperando del distribuidor', 'Precio actual'],
+      PRODUCTOS.map((p, i) => [chip(p), num(stock[i]), dosSemanas('dt', i), dinero2(eq.precio[i])])
     );
     const formulario = tabla(
       ['Sabor', 'Precio al cliente ($2.50 a $8.00)', 'Pedir al distribuidor (llega en 2 semanas)'],
@@ -554,21 +815,47 @@
       'form'
     );
     const ultima = rep
-      ? `<h3>Lo que pasó la semana pasada</h3>` + tabla(
-          ['Sabor', 'Precio', 'Demanda', 'Vendido', 'Perdido', 'Clientes de la otra tienda', 'Clientes que se fueron'],
-          PRODUCTOS.map((p, i) => [chip(p), dinero2(rep.precio[i]), num(rep.demanda[i]), num(rep.vendido[i]),
-            num(rep.perdidoFinal[i]), num(rep.desvRec[i]), num(rep.desvEnv[i])]))
+      ? `<h3>🤝 Con el distribuidor y los clientes (semana pasada)</h3>` + tabla(
+          ['Sabor', 'Tú pediste', 'Distribuidor despachó', 'Demanda', 'Vendido', 'Perdido'],
+          PRODUCTOS.map((p, i) => [chip(p), num(rep.pedidoDist[i]), num(rep.despDT[i]), num(rep.demanda[i]),
+            num(rep.vendido[i]), num(rep.perdidoFinal[i])]))
       : '<p class="ayuda">Aquí verás lo que pasó cuando termine la primera semana.</p>';
     return `
       <h2>Tu decisión · Tienda final</h2>
-      <p class="ayuda">Decides el precio de cada sabor y cuánto pedir al distribuidor. Vendes a los clientes desde tu stock.</p>
-      <h3>Tu stock</h3>
-      ${tablaStock}
+      <p class="ayuda">Decides el precio de cada sabor y cuánto pedir al distribuidor. Vendes a los clientes desde tu almacén.</p>
+      <h3>Tu situación ahora</h3>
+      ${situacion}
       ${ultima}
       <h3>Precio y pedido</h3>
       <p class="ayuda">Un precio más alto baja tu parte de la demanda y la pasa a la otra tienda. Te sugerimos pedir lo que se demandó la semana pasada.</p>
       ${formulario}
+      ${estim}
       ${boton}${estadoEnvio}`;
+  }
+
+  // Resumen en vivo de lo que estás escribiendo (no se guarda: solo ayuda a decidir)
+  function actualizarEstimado() {
+    const el = $('estim');
+    const yo = datos && datos.yo;
+    if (!el || !yo || !estado) return;
+    const v = (sel) => Array.from(document.querySelectorAll(sel)).map((x) => Number(x.value) || 0);
+    let txt = '';
+    if (yo.rol === 'fabrica') {
+      const cal = Array.from(document.querySelectorAll('#mi .cal')).map((x) => CALIDADES[x.value] ? CALIDADES[x.value].costo : 1);
+      const prod = v('#mi .prod');
+      const costo = suma(prod.map((q, i) => q * CONFIG.costoBase * (cal[i] || 1)));
+      txt = `Vas a producir <b>${num(suma(prod))}</b> galletas. Costo total: <b>${money(costo)}</b> (se descuenta de la ganancia cuando se vendan, no ahora).`;
+    } else if (yo.rol === 'distribuidor') {
+      const ped = v('#mi .ped');
+      const pujas = v('#mi .pm');
+      const maxPuja = suma(pujas);
+      txt = `Pedirás <b>${num(suma(ped))}</b> galletas a fábrica.` +
+        (maxPuja > 0 ? ` Tus pujas suman <b>${money(maxPuja)}</b>: solo pagas las que ganes.` : ' No estás pujando.');
+    } else {
+      const ped = v('#mi .ped');
+      txt = `Pedirás <b>${num(suma(ped))}</b> galletas al distribuidor. Guardar una galleta en tu almacén cuesta ${dinero2(CONFIG.precioDist * CONFIG.tasaMantenimiento)} por semana.`;
+    }
+    el.innerHTML = txt;
   }
 
   // Pujas secretas por los influencers (solo distribuidores). Solo se pide un monto.
@@ -576,15 +863,15 @@
     const filas = INF_KEYS.map((k, idx) => {
       const inf = estado.inf[k];
       const info = INFLUENCERS[k];
-      const ocupado = actual < inf.ocupadoHasta;
+      const ocup = actual < inf.ocupadoHasta;
       const monto = lim.pujas[idx] ? lim.pujas[idx].monto : 0;
-      const estadoTxt = ocupado
+      const estadoTxt = ocup
         ? `<span class="neg">Ocupado</span><br><small>${esc(EQ[inf.dueno])} · +${pct(inf.uplift)} en todos los sabores · hasta la semana ${inf.hasta}</small>`
         : `<span class="pos">Libre</span><br><small>sube la demanda ${pct(info.min)} a ${pct(info.max)}</small>`;
       return [
         `<b>Influencer ${k}</b>`,
         estadoTxt,
-        ocupado ? '—' : `<input type="number" class="pm" data-k="${idx}" min="0" max="${CONFIG.topeMonto}" step="1" inputmode="numeric" value="${monto}">`,
+        ocup ? '—' : `<input type="number" class="pm" data-k="${idx}" min="0" max="${CONFIG.topeMonto}" step="1" inputmode="numeric" value="${monto}">`,
       ];
     });
     return `
@@ -598,8 +885,8 @@
     const filas = INF_KEYS.map((k) => {
       const inf = estado.inf[k];
       const info = INFLUENCERS[k];
-      const ocupado = actual < inf.ocupadoHasta;
-      const estadoTxt = ocupado
+      const ocup = actual < inf.ocupadoHasta;
+      const estadoTxt = ocup
         ? `<span class="neg">Ocupado</span> · ${esc(EQ[inf.dueno])} · +${pct(inf.uplift)} · hasta la semana ${inf.hasta}`
         : '<span class="pos">Libre</span> · se subasta esta semana';
       return [`<b>Influencer ${k}</b>`, `${pct(info.min)} a ${pct(info.max)}`, estadoTxt];
@@ -617,7 +904,7 @@
     const r = ult.equipos[yo.equipo];
     const u = r.utilidadRonda;
     let html = `
-      <h2>Última semana (${ult.ronda}) · ${EQ[yo.equipo]}</h2>
+      <h2>Última semana (${ult.ronda}) · ${esc(EQ[yo.equipo])}</h2>
       <p>Ganancia del equipo esta semana: <b class="${u.total >= 0 ? 'pos' : 'neg'}">${money(u.total)}</b></p>
       <p class="ayuda">Margen de ventas ${money(u.ventas)} − mantenimiento ${money(u.mantenimiento)} − pujas pagadas ${money(u.influencers)}</p>`;
 
@@ -644,7 +931,7 @@
       const u = estado.equipos[X].utilidad;
       const semana = ult ? ult.equipos[X].utilidadRonda.total : 0;
       return [
-        `${EQ[X]}${yo && X === yo.equipo ? ' (tú)' : ''}`,
+        `${esc(EQ[X])}${yo && X === yo.equipo ? ' (tú)' : ''}`,
         money(u.ventas), money(u.mantenimiento), money(u.influencers),
         `<b>${money(JR.sumaUtil(u))}</b>`, money(semana),
       ];
@@ -655,13 +942,40 @@
       <p class="ayuda">Gana el equipo con más total al terminar la partida.</p>`;
   }
 
-  function actualizarTiempo() {
-    const el = $('tiempo');
-    if (!el || !datos || !datos.sala || datos.sala.estado !== 'jugando' || !actual) return;
-    const fin = finRonda(actual);
-    if (!fin) return;
-    const seg = Math.max(0, Math.ceil((fin - Date.now()) / 1000));
-    el.textContent = seg > 0 ? `⏱ ${seg} s` : 'Cerrando semana…';
+  // ---------- CRONÓMETRO FIJO ----------
+  // Siempre visible (barra fija arriba, no se mueve al hacer scroll). Rojo y parpadeando en los últimos 10 s.
+  function tick() {
+    const rl = $('reloj');
+    if (!rl) return;
+    const s = datos && datos.sala;
+    let fin = null;
+    let total = 0;
+    let etiqueta = '';
+    if (s && s.estado === 'eleccion' && s.eleccion_fin) {
+      fin = Date.parse(s.eleccion_fin);
+      total = SEG_ELECCION;
+      etiqueta = 'Elige tu puesto';
+    } else if (s && s.estado === 'jugando' && datos.semana && datos.semana.fin && datos.yo && datos.yo.rol) {
+      fin = Date.parse(datos.semana.fin);
+      total = s.segundos;
+      etiqueta = `Semana ${Math.min(datos.semana.ronda, s.total_rondas)} de ${s.total_rondas} · ${EQ[datos.yo.equipo]} · ${ROLN[datos.yo.rol]}`;
+    }
+    if (!fin || isNaN(fin)) { rl.hidden = true; document.body.classList.remove('con-reloj'); return; }
+    rl.hidden = false;
+    document.body.classList.add('con-reloj');
+    const ms = fin - ahoraServidor();
+    const seg = Math.max(0, Math.ceil(ms / 1000));
+    $('cab').textContent = etiqueta;
+    $('rl-seg').textContent = ms <= 0 && s.estado === 'jugando' ? 'Cerrando…' : `⏱ ${Math.floor(seg / 60)}:${String(seg % 60).padStart(2, '0')}`;
+    $('rl-prog').style.width = Math.max(0, Math.min(100, (ms / (total * 1000)) * 100)) + '%';
+    rl.classList.toggle('rojo', seg <= 10);
+
+    // Si se acaba el tiempo y no enviaste nada, se envía automáticamente lo que tienes en pantalla
+    if (s.estado === 'jugando' && ms <= 2000 && ms > -2500 && datos.miDec === null
+        && datos.semana.ronda === actual && autoRonda !== actual && pantalla === 'juego') {
+      autoRonda = actual;
+      enviarDec(true).catch(() => {});   // un solo intento por semana
+    }
   }
 
   // ---------- FIN ----------
@@ -671,21 +985,23 @@
     const ganador = total.A > total.B ? 'A' : total.B > total.A ? 'B' : null;
     const ult = estado.historial[estado.historial.length - 1];
     const yo = datos.yo;
-    const equipos = JR.EQUIPOS.map((X) => {
-      const integrantes = datos.jugadores
-        .filter((j) => j.equipo === X)
-        .map((j) => `${j.es_bot ? '🤖 ' : ''}${esc(j.nombre)} <small>(${ROLN[j.rol]})</small>`).join('<br>');
-      return `<div class="equipo"><h3>${EQ[X]}</h3><p>${integrantes}</p></div>`;
+    const equipos = (ganador ? [ganador, ganador === 'A' ? 'B' : 'A'] : ['A', 'B']).map((X) => {
+      const integrantes = ROLES.map((rol) => datos.jugadores.find((j) => j.equipo === X && j.rol === rol)).filter(Boolean)
+        .map((j) => `<div class="int">${avatar(j.avatar, 'med')} <div><b>${esc(j.nombre)}</b>${j.es_bot ? ' 🤖' : ''}<br><small>${ROLI[j.rol]} ${ROLN[j.rol]}</small></div></div>`).join('');
+      const etiqueta = !ganador ? 'Empate' : X === ganador ? '🏆 Ganadores' : 'Perdedores';
+      return `<div class="equipo ${ganador && X === ganador ? 'gana' : ''}"><h3>${esc(EQ[X])} · ${etiqueta}</h3>
+        <p class="${total[X] >= 0 ? 'pos' : 'neg'}"><b>${money(total[X])}</b></p>${integrantes}</div>`;
     }).join('');
     render($('fin'), `
       <h1>Partida terminada</h1>
       <p class="ganador">${ganador
-        ? `🏆 Gana ${EQ[ganador]}${yo && yo.equipo === ganador ? ' (¡tu equipo!)' : ''}`
+        ? `🏆 Gana ${esc(EQ[ganador])}${yo && yo.equipo === ganador ? ' (¡tu equipo!)' : ''}`
         : 'Empate'}</p>
       <div class="fila">${equipos}</div>
       ${htmlMarc(yo, ult)}
       <button class="principal" data-accion="salir">Nueva partida</button>
       <p class="ayuda">Versión del juego: ${esc(JR.VERSION)}</p>`);
+    tick();
   }
 
   // ---------- ARRANQUE ----------
@@ -695,5 +1011,5 @@
     construir('inicio');
   }
   setInterval(refrescar, 1200);
-  setInterval(actualizarTiempo, 500);
+  setInterval(tick, 250);
 })();

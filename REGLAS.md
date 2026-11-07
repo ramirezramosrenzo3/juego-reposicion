@@ -1,10 +1,11 @@
-# Reglas del juego de reposición (versión 3.1: con bots)
+# Reglas del juego de reposición (versión 3.2: avatares y elección de puesto)
 
 Esta es la referencia del juego. Los números exactos están en `game.js` (bloque `CONFIG`, `PRODUCTOS`, `CALIDADES`, `INFLUENCERS`). Si este documento y el código no coinciden, avísame para corregir uno de los dos.
 
 ## 1. Equipos y roles
 
-- 2 equipos de 3 jugadores. El anfitrión inicia la partida y el juego sortea los equipos y los roles.
+- 2 equipos de 3 jugadores: **G'sertte** y **Gallecolors**. Al iniciar el anfitrión se abre una sala de **2 minutos** donde cada persona elige equipo y puesto (el primero en confirmar un puesto lo bloquea; puede desbloquearlo para cambiar). Quien no elige, y los bots, reciben al azar los puestos que quedan.
+- Cada persona elige un avatar (1 de 20, único dentro de la sala). Solo se muestra quién ocupa cada puesto de **tu** equipo, no del rival; en la pantalla final se muestran ambos equipos con avatares.
 - Un lugar puede ocuparlo una persona o un **bot** (sección 16): no hacen falta 6 personas.
 - Cada equipo tiene la misma cadena: **Fábrica → Distribuidor → Tienda final → clientes**.
 - Cada rol es responsable de un área:
@@ -20,7 +21,7 @@ Esta es la referencia del juego. Los números exactos están en `game.js` (bloqu
 - La semana se cierra cuando los 6 jugadores deciden, o cuando se acaba el tiempo. Los bots deciden solos apenas empieza la semana, así que con una persona y 5 bots la semana se cierra cuando esa persona decide.
 - Puedes cambiar tu decisión hasta que se cierre la semana. Nadie ve las decisiones de los demás antes del cierre.
 - Cualquiera puede salir de la sala durante la espera. Si el anfitrión sale durante la espera, la sala se borra.
-- Si un jugador no decide a tiempo, esa semana su equipo no cambia precio ni calidad, **no envía pedidos ni produce, y no puja**. Lo que ya tenía en stock se sigue vendiendo.
+- Si no envías tu decisión, **se envía sola** lo que tengas en pantalla unos 2 segundos antes de acabar el tiempo (si tu celular sigue abierto). Si el celular está cerrado, esa semana su equipo no cambia precio ni calidad, **no envía pedidos ni produce, y no puja**. Lo que ya tenía en stock se sigue vendiendo.
 
 ## 3. Productos
 

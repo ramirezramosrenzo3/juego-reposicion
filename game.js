@@ -55,7 +55,7 @@
   const N = PRODUCTOS.length;
 
   // Versión del motor: se muestra en la sala para detectar celulares con reglas distintas
-  const VERSION = '3.1';
+  const VERSION = '3.2';
 
   // ---------- UTILIDADES ----------
   const zeros = () => Array(N).fill(0);

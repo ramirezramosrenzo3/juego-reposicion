@@ -20,6 +20,7 @@ Vas a hacer 6 cosas:
 | `config.js` | Tus claves de Supabase (lo único que editas) | **Sí** |
 | `game.js` | Las reglas y los números del juego | **Sí** |
 | `app.js` | Las pantallas de cada rol y la conexión | **Sí** |
+| `avatares.js` | Los 20 avatares (aquí se cambian por tus dibujos) | **Sí** |
 | `supabase.sql` | Crea las tablas en la base de datos | No (solo se pega en Supabase) |
 | `REGLAS.md` | Las reglas completas explicadas | Opcional |
 | `GUIA.md` | Esta guía | Opcional |
@@ -82,11 +83,12 @@ window.CONFIG_SUPABASE = {
 1. Entra a **github.com**, crea una cuenta si no tienes y haz clic en **New repository** (el botón verde o el ícono **+**).
 2. Nombre del repositorio: `juego-reposicion`. Marca **Public**. Haz clic en **Create repository**.
 3. En la página que aparece, haz clic en el enlace **uploading an existing file**.
-4. Abre la carpeta `juego-reposicion` que descomprimiste en el paso 1. Selecciona **los archivos** (no la carpeta) y arrástralos a la página de GitHub. Como mínimo deben subir estos 4:
+4. Abre la carpeta `juego-reposicion` que descomprimiste en el paso 1. Selecciona **los archivos** (no la carpeta) y arrástralos a la página de GitHub. Como mínimo deben subir estos 5:
    - `index.html`
    - `config.js`
    - `game.js`
    - `app.js`
+   - `avatares.js`
    También puedes subir `REGLAS.md`, `GUIA.md` y `test.js`. No subas `supabase.sql` ni la carpeta `validacion`.
 5. **Importante:** los archivos deben quedar en la raíz del repositorio, no dentro de otra carpeta. En la lista debes ver `index.html` directamente, sin una carpeta de por medio.
 6. Abajo, en el cuadro de mensaje, escribe cualquier texto (por ejemplo "primera versión") y haz clic en **Commit changes**.
@@ -139,13 +141,19 @@ Si abres el link de **otra** sala, el juego cambia a esa sala. Para salir de una
 
 ## Cómo se juega
 
-Al iniciar, el juego sortea los equipos (3 y 3) y los roles dentro de cada equipo. Cada persona ve solo la pantalla de su rol:
+1. En la primera pantalla cada persona **elige su avatar** (uno de 20) y escribe su nombre. Dos personas de la misma sala no pueden tener el mismo avatar.
+2. Al darle **Iniciar** el anfitrión, se abre una **sala de elección de 2 minutos**: cada uno elige su equipo (**G'sertte** o **Gallecolors**) y su puesto. El primero en confirmar un puesto lo bloquea para los demás (se ve en tiempo real); puedes desbloquearlo para cambiar. Quien no elija a tiempo recibe un puesto al azar, igual que los bots.
+3. En la partida solo ves los nombres y avatares de **tu** equipo; los puestos del otro equipo no se muestran.
+4. Arriba hay un **cronómetro fijo** (se pone rojo en los últimos 10 s). Si no envías tu decisión, **se envía sola** lo que tengas en pantalla justo antes de acabar el tiempo.
+5. Verás una **cadena animada** con camiones que avanzan cada semana, el **dinero del equipo** y, en tu tabla, lo que tienes en almacén, lo que se produce y lo que se está entregando.
+
+Cada persona ve solo la pantalla de su rol:
 
 - **Fábrica:** elige la calidad de cada sabor (económico, estándar o premium) y cuántas galletas producir. Lo producido llega en 2 semanas.
 - **Distribuidor:** elige cuánto pedir a la fábrica (llega en 2 semanas) y, si quiere, **puja por los influencers** (ver abajo).
 - **Tienda final:** elige el precio de cada sabor (entre $2.50 y $8.00) y cuánto pedir al distribuidor (llega en 2 semanas).
 
-Todos los celulares deben mostrar la misma **versión del juego** (aparece en la sala de espera y al final de la partida, por ejemplo `3.1`). Si alguien ve otra, que recargue la página.
+Todos los celulares deben mostrar la misma **versión del juego** (aparece en la sala de espera y al final de la partida, por ejemplo `3.2`). Si alguien ve otra, que recargue la página.
 
 Cada semana:
 1. Escribe tu decisión y toca **Enviar decisión**. Puedes cambiarla mientras el tiempo corra, con **Actualizar decisión**.
@@ -164,6 +172,10 @@ Un bot es un jugador que maneja el juego. Ocupa un lugar de fábrica, distribuid
 - **Qué hacen:** la fábrica produce en calidad estándar; el distribuidor y la tienda piden para tener unas 4 semanas de la demanda reciente; la tienda vende a $4.50; el distribuidor puja por influencers libres solo si la tienda tiene stock para atender más demanda.
 - **Qué tan buenos son:** son un rival razonable, no un experto. En simulaciones atienden casi toda la demanda, quedan parejos entre ellos y le ganan siempre a un equipo que no hace nada. Los detalles están en `REGLAS.md`, sección 16.
 - **Importante:** las decisiones de los bots las envía el celular de las personas. Si todas las personas cierran la página, la partida se detiene hasta que alguien vuelva a abrirla.
+
+## Actualizar a la versión 3.2 (si ya tenías el juego funcionando)
+
+Mismos pasos que abajo, pero en el paso 2 sube **4 archivos**: `index.html`, `game.js`, `app.js` y `avatares.js` (nunca `config.js`). La sala de espera debe decir **Versión del juego: 3.2**. Para usar tus propios dibujos de avatar, mira los comentarios al inicio de `avatares.js`.
 
 ## Actualizar a la versión 3.1 (si ya tenías el juego funcionando)
 
@@ -233,8 +245,8 @@ Para cambiar un número: en GitHub abre `game.js`, toca el ícono del lápiz, ca
 | "La sala no existe" | Revisa que el código esté bien escrito. Las letras no distinguen mayúsculas. |
 | "La partida ya empezó" | Solo puedes unirte antes de que el anfitrión toque **Iniciar partida**. |
 | "La sala ya tiene 6 jugadores" | Ya están completos y no hay bots que ceder. Crea otra sala. |
-| "Falta actualizar la base de datos…" o "Could not find the function … completar_bots" | Pega de nuevo el `supabase.sql` de la versión 3.1 en Supabase y toca **Run** (ver **Actualizar a la versión 3.1**). |
-| Los bots no deciden y la semana espera todo el tiempo | Revisa que al menos una persona tenga la página abierta y que todos tengan la misma versión (3.1). |
+| "Falta actualizar la base de datos…" o "Could not find the function … completar_bots" | Pega de nuevo el `supabase.sql` de la versión 3.2 en Supabase y toca **Run** (ver **Actualizar a la versión 3.1**). |
+| Los bots no deciden y la semana espera todo el tiempo | Revisa que al menos una persona tenga la página abierta y que todos tengan la misma versión (3.2). |
 | "Se acabó el tiempo de esta semana" | La semana ya se cerró. Espera a la siguiente. |
 | Error en rojo en el SQL de Supabase | Copia el mensaje completo y envíamelo. |
 | El proyecto de Supabase no responde | Los proyectos gratis se pausan tras una semana sin uso. Entra a Supabase y reactívalo. |
