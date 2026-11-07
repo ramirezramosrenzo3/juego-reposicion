@@ -124,13 +124,15 @@
       box-shadow: 0 2px 8px rgba(0,0,0,.25);
     }
     .reloj[hidden] { display: none; }
-    .rl-fila { display: flex; justify-content: space-between; align-items: center; gap: 10px; max-width: 720px; margin: 0 auto; font-size: .85rem; }
-    #rl-seg { font-size: 1.5rem; font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .rl-fila { height: 34px; display: flex; justify-content: space-between; align-items: center; gap: 10px; max-width: 720px; margin: 0 auto; font-size: .85rem; }
+    #cab { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; flex: 1; }
+    #rl-seg { font-size: 1.5rem; font-variant-numeric: tabular-nums; white-space: nowrap; min-width: 5.2ch; text-align: right; }
     .rl-barra { height: 5px; background: rgba(255,255,255,.3); border-radius: 3px; margin: 5px auto 0; max-width: 720px; overflow: hidden; }
-    .rl-barra i { display: block; height: 100%; background: #fff; transition: width .25s linear; }
-    .reloj.rojo { background: #dc2626; animation: pulso .8s infinite; }
-    @keyframes pulso { 50% { background: #7f1d1d; } }
-    body.con-reloj { padding-top: calc(58px + env(safe-area-inset-top)); }
+    .rl-barra i { display: block; height: 100%; width: 100%; background: #fff; transform-origin: left; transition: transform .25s linear; will-change: transform; }
+    .reloj.rojo { background: #dc2626; }
+    .reloj.rojo #rl-seg { animation: pulso .8s infinite; }
+    @keyframes pulso { 50% { opacity: .45; } }
+    body.con-reloj { padding-top: calc(62px + env(safe-area-inset-top)); }
     .toast {
       position: fixed; left: 50%; bottom: 24px; transform: translate(-50%, 80px); opacity: 0;
       background: #111827; color: #fff; padding: 10px 16px; border-radius: 20px; z-index: 60;

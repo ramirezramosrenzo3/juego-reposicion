@@ -55,6 +55,7 @@
     guardar('sala', null);
   }
 
+  let vista = null;     // copia COMPLETA de los datos (solo la usa el cronómetro, así nunca ve datos a medias)
   let datos = null;     // filas de la base + datos propios del jugador
   let estado = null;    // estado del juego calculado por game.js
   let actual = 0;       // número de la semana que se está jugando
@@ -200,6 +201,7 @@
     sala = null;
     datos = null;
     estado = null;
+    vista = null;
     guardar('sala', null);
     pantalla = '';
     semanaVista = 0;
@@ -414,6 +416,7 @@
         if (md.error) throw new Error(md.error.message);
         datos.miDec = md.data ?? null;   // null si todavía no decide esta semana
       }
+      vista = datos;
       calcular();
       pintar();
       await conducirBots();
@@ -947,7 +950,7 @@
   function tick() {
     const rl = $('reloj');
     if (!rl) return;
-    const s = datos && datos.sala;
+    const s = vista && vista.sala;
     let fin = null;
     let total = 0;
     let etiqueta = '';
@@ -955,10 +958,10 @@
       fin = Date.parse(s.eleccion_fin);
       total = SEG_ELECCION;
       etiqueta = 'Elige tu puesto';
-    } else if (s && s.estado === 'jugando' && datos.semana && datos.semana.fin && datos.yo && datos.yo.rol) {
-      fin = Date.parse(datos.semana.fin);
+    } else if (s && s.estado === 'jugando' && vista.semana && vista.semana.fin && vista.yo && vista.yo.rol) {
+      fin = Date.parse(vista.semana.fin);
       total = s.segundos;
-      etiqueta = `Semana ${Math.min(datos.semana.ronda, s.total_rondas)} de ${s.total_rondas} · ${EQ[datos.yo.equipo]} · ${ROLN[datos.yo.rol]}`;
+      etiqueta = `Semana ${Math.min(vista.semana.ronda, s.total_rondas)} de ${s.total_rondas} · ${EQ[vista.yo.equipo]} · ${ROLN[vista.yo.rol]}`;
     }
     if (!fin || isNaN(fin)) { rl.hidden = true; document.body.classList.remove('con-reloj'); return; }
     rl.hidden = false;
@@ -967,12 +970,12 @@
     const seg = Math.max(0, Math.ceil(ms / 1000));
     $('cab').textContent = etiqueta;
     $('rl-seg').textContent = ms <= 0 && s.estado === 'jugando' ? 'Cerrando…' : `⏱ ${Math.floor(seg / 60)}:${String(seg % 60).padStart(2, '0')}`;
-    $('rl-prog').style.width = Math.max(0, Math.min(100, (ms / (total * 1000)) * 100)) + '%';
+    $('rl-prog').style.transform = `scaleX(${Math.max(0, Math.min(1, ms / (total * 1000)))})`;
     rl.classList.toggle('rojo', seg <= 10);
 
     // Si se acaba el tiempo y no enviaste nada, se envía automáticamente lo que tienes en pantalla
-    if (s.estado === 'jugando' && ms <= 2000 && ms > -2500 && datos.miDec === null
-        && datos.semana.ronda === actual && autoRonda !== actual && pantalla === 'juego') {
+    if (s.estado === 'jugando' && ms <= 2000 && ms > -2500 && vista.miDec === null
+        && vista.semana.ronda === actual && autoRonda !== actual && pantalla === 'juego') {
       autoRonda = actual;
       enviarDec(true).catch(() => {});   // un solo intento por semana
     }
