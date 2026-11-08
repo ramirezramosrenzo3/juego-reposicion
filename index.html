@@ -140,17 +140,18 @@
     .toast.ver { transform: translate(-50%, 0); opacity: 1; }
 
     /* ---- avatares ---- */
-    .av { display: inline-flex; flex-direction: column; align-items: center; justify-content: center; position: relative;
+    .av { flex: none; display: inline-flex; flex-direction: column; align-items: center; justify-content: center; position: relative;
       width: 48px; height: 48px; border-radius: 50%; background: #e0e7ff; font-size: 1.7rem; line-height: 1; vertical-align: middle; }
-    .av img { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; }
+    .av.con-img { background: none; border-radius: 0; }
+    .av img { width: 100%; height: 100%; object-fit: contain; }
     .av i { position: absolute; right: -2px; bottom: -2px; background: var(--azul); color: #fff; font-style: normal;
       font-size: .62rem; font-weight: 700; min-width: 17px; height: 17px; line-height: 17px; text-align: center; border-radius: 9px; }
-    .av.peq { width: 26px; height: 26px; font-size: 1rem; }
+    .av.peq { width: 30px; height: 30px; font-size: 1rem; }
     .av.peq i { font-size: .5rem; min-width: 12px; height: 12px; line-height: 12px; }
-    .av.med { width: 44px; height: 44px; }
-    .av.grande { width: 110px; height: 110px; font-size: 4rem; }
+    .av.med { width: 56px; height: 56px; }
+    .av.grande { width: 140px; height: 140px; font-size: 4rem; }
     .av.grande i { font-size: 1rem; min-width: 28px; height: 28px; line-height: 28px; border-radius: 14px; }
-    .grid-av { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; }
+    .grid-av { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
     .grid-av .av-btn { margin: 0; padding: 6px 0; background: #f3f4f6; border: 2px solid transparent; border-radius: 12px; width: auto; }
     .grid-av .av-btn.sel { border-color: var(--azul); background: #dbeafe; }
     .perfil { text-align: center; margin-top: 10px; }

@@ -5,7 +5,7 @@ Esta es la referencia del juego. Los números exactos están en `game.js` (bloqu
 ## 1. Equipos y roles
 
 - 2 equipos de 3 jugadores: **G'sertte** y **Gallecolors**. Al iniciar el anfitrión se abre una sala de **2 minutos** donde cada persona elige equipo y puesto (el primero en confirmar un puesto lo bloquea; puede desbloquearlo para cambiar). Quien no elige, y los bots, reciben al azar los puestos que quedan.
-- Cada persona elige un avatar (1 de 20, único dentro de la sala). Solo se muestra quién ocupa cada puesto de **tu** equipo, no del rival; en la pantalla final se muestran ambos equipos con avatares.
+- Cada persona elige un avatar (1 de 16, único dentro de la sala). Solo se muestra quién ocupa cada puesto de **tu** equipo, no del rival; en la pantalla final se muestran ambos equipos con avatares.
 - Un lugar puede ocuparlo una persona o un **bot** (sección 16): no hacen falta 6 personas.
 - Cada equipo tiene la misma cadena: **Fábrica → Distribuidor → Tienda final → clientes**.
 - Cada rol es responsable de un área:

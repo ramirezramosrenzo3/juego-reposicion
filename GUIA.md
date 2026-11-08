@@ -20,7 +20,7 @@ Vas a hacer 6 cosas:
 | `config.js` | Tus claves de Supabase (lo único que editas) | **Sí** |
 | `game.js` | Las reglas y los números del juego | **Sí** |
 | `app.js` | Las pantallas de cada rol y la conexión | **Sí** |
-| `avatares.js` | Los 20 avatares (aquí se cambian por tus dibujos) | **Sí** |
+| `avatares.js` | Los 16 avatares (se usan las imágenes de la carpeta `avatares`) | **Sí** |
 | `supabase.sql` | Crea las tablas en la base de datos | No (solo se pega en Supabase) |
 | `REGLAS.md` | Las reglas completas explicadas | Opcional |
 | `GUIA.md` | Esta guía | Opcional |
@@ -141,7 +141,7 @@ Si abres el link de **otra** sala, el juego cambia a esa sala. Para salir de una
 
 ## Cómo se juega
 
-1. En la primera pantalla cada persona **elige su avatar** (uno de 20) y escribe su nombre. Dos personas de la misma sala no pueden tener el mismo avatar.
+1. En la primera pantalla cada persona **elige su avatar** (uno de 16) y escribe su nombre. Dos personas de la misma sala no pueden tener el mismo avatar.
 2. Al darle **Iniciar** el anfitrión, se abre una **sala de elección de 2 minutos**: cada uno elige su equipo (**G'sertte** o **Gallecolors**) y su puesto. El primero en confirmar un puesto lo bloquea para los demás (se ve en tiempo real); puedes desbloquearlo para cambiar. Quien no elija a tiempo recibe un puesto al azar, igual que los bots.
 3. En la partida solo ves los nombres y avatares de **tu** equipo; los puestos del otro equipo no se muestran.
 4. Arriba hay un **cronómetro fijo** (se pone rojo en los últimos 10 s). Si no envías tu decisión, **se envía sola** lo que tengas en pantalla justo antes de acabar el tiempo.
@@ -175,7 +175,7 @@ Un bot es un jugador que maneja el juego. Ocupa un lugar de fábrica, distribuid
 
 ## Actualizar a la versión 3.2 (si ya tenías el juego funcionando)
 
-Mismos pasos que abajo, pero en el paso 2 sube **4 archivos**: `index.html`, `game.js`, `app.js` y `avatares.js` (nunca `config.js`). La sala de espera debe decir **Versión del juego: 3.2**. Para usar tus propios dibujos de avatar, mira los comentarios al inicio de `avatares.js`.
+Mismos pasos que abajo, pero en el paso 2 sube **4 archivos y la carpeta `avatares`**: `index.html`, `game.js`, `app.js` y `avatares.js` (nunca `config.js`). La sala de espera debe decir **Versión del juego: 3.2**. Sube también la carpeta `avatares` (16 imágenes) con **Add file → Upload files**.
 
 ## Actualizar a la versión 3.1 (si ya tenías el juego funcionando)
 

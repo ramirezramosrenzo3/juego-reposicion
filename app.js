@@ -1,6 +1,6 @@
 /*
   INTERFAZ DEL JUEGO (versión 3.2: avatares, elección de puesto, cronómetro fijo, camiones)
-  Se conecta a Supabase (salas y decisiones) y usa game.js (las reglas) y avatares.js (los 20 avatares).
+  Se conecta a Supabase (salas y decisiones) y usa game.js (las reglas) y avatares.js (los 16 avatares).
   Cada celular refresca cada 1.2 segundos y recalcula el estado completo.
 */
 (function () {
@@ -104,8 +104,11 @@
   function avatar(id, tam = '') {
     const a = AVATARES.find((x) => x.id === Number(id));
     if (!a) return `<span class="av ${tam}">?</span>`;
-    const cuerpo = a.img ? `<img src="${esc(a.img)}" alt="">` : a.cara;
-    return `<span class="av ${tam}">${cuerpo}<i>${a.id}</i></span>`;
+    if (a.img) {
+      return `<span class="av con-img ${tam}"><img src="${esc(a.img)}" alt="Avatar ${a.id}" loading="eager" ` +
+        `onerror="this.parentNode.classList.remove('con-img');this.parentNode.innerHTML='${a.cara}<i>${a.id}</i>'"></span>`;
+    }
+    return `<span class="av ${tam}">${a.cara}<i>${a.id}</i></span>`;
   }
   const quienHtml = (j) => `${avatar(j.avatar, 'peq')} <b>${esc(j.nombre)}</b>${j.es_bot ? ' 🤖' : ''}`;
 
@@ -125,7 +128,7 @@
             <input id="nombre" value="${esc(nombre)}" maxlength="20" autocomplete="off" placeholder="Escribe tu nombre">
           </label>
         </div>
-        <p class="ayuda" id="pide-av" ${avatarSel ? 'hidden' : ''}>Toca uno de los 20 avatares para empezar.</p>
+        <p class="ayuda" id="pide-av" ${avatarSel ? 'hidden' : ''}>Toca uno de los 16 avatares para empezar.</p>
         <h2>2. Crea una sala o únete</h2>
         <div class="fila">
           <label>Semanas (5 a 60)
