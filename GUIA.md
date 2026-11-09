@@ -20,6 +20,7 @@ Vas a hacer 6 cosas:
 | `config.js` | Tus claves de Supabase (lo único que editas) | **Sí** |
 | `game.js` | Las reglas y los números del juego | **Sí** |
 | `app.js` | Las pantallas de cada rol y la conexión | **Sí** |
+| `img/` (carpeta) | Logo, galletas, camión, fábrica, distribución y tienda del Brand Board | **Sí** |
 | `avatares.js` | Los 16 avatares (se usan las imágenes de la carpeta `avatares`) | **Sí** |
 | `supabase.sql` | Crea las tablas en la base de datos | No (solo se pega en Supabase) |
 | `REGLAS.md` | Las reglas completas explicadas | Opcional |
@@ -175,7 +176,7 @@ Un bot es un jugador que maneja el juego. Ocupa un lugar de fábrica, distribuid
 
 ## Actualizar a la versión 3.2 (si ya tenías el juego funcionando)
 
-Mismos pasos que abajo, pero en el paso 2 sube **4 archivos y la carpeta `avatares`**: `index.html`, `game.js`, `app.js` y `avatares.js` (nunca `config.js`). La sala de espera debe decir **Versión del juego: 3.2**. Sube también la carpeta `avatares` (16 imágenes) con **Add file → Upload files**.
+Mismos pasos que abajo, pero en el paso 2 sube **4 archivos y las carpetas `avatares` e `img`**: `index.html`, `game.js`, `app.js` y `avatares.js` (nunca `config.js`). La sala de espera debe decir **Versión del juego: 3.2**. Sube también la carpeta `avatares` (16 imágenes) con **Add file → Upload files**.
 
 ## Actualizar a la versión 3.1 (si ya tenías el juego funcionando)
 

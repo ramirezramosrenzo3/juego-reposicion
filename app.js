@@ -79,7 +79,10 @@
   const pct = (x) => Math.round(x * 100) + '%';
   const suma = (arr) => arr.reduce((a, b) => a + b, 0);
   const ahoraServidor = () => Date.now() + desfase;
-  const chip = (p) => `<span class="chip" style="background:${p.color}"></span>${esc(p.nombre)}`;
+  const chip = (p) => `<img class="gal" src="img/galleta${PRODUCTOS.indexOf(p) + 1}.png" alt="">${esc(p.nombre)}`;
+  const ic = (n) => `<img class="ic-s" src="img/${n}.png" alt="">`;
+  const ESC = { fabrica: 'fabrica', distribuidor: 'distribucion', tienda: 'tienda' };
+  const escena = (rol, cls = 'esc-rol') => `<img class="${cls}" src="img/${ESC[rol]}.png" alt="${ROLN[rol]}">`;
   const render = (el, html) => {
     if (!el) return;
     if (el._h !== html) { el.innerHTML = html; el._h = html; }
@@ -114,9 +117,21 @@
 
   // ---------- PANTALLAS ----------
   const PLANTILLAS = {
+    home: () => `
+      <section class="home">
+        <img class="deco" style="left:6%;top:7%" src="img/galleta1.png" alt="">
+        <img class="deco" style="right:8%;top:11%;animation-delay:.6s" src="img/galleta4.png" alt="">
+        <img class="deco" style="left:10%;bottom:17%;animation-delay:1.2s" src="img/galleta3.png" alt="">
+        <img class="deco" style="right:7%;bottom:21%;animation-delay:1.8s" src="img/galleta5.png" alt="">
+        <img class="logo" src="img/logo.png" alt="Cookie Production Fight!">
+        <p class="lema">Produce, distribuye y vende. ¡Supera a tu rival!</p>
+        <div class="escenas"><img src="img/fabrica.png" alt=""><img src="img/distribucion.png" alt=""><img src="img/tienda.png" alt=""></div>
+        <button class="principal btn-iniciar" data-accion="iniciar-juego">INICIAR ▶</button>
+        <p class="pie">Versión ${esc(JR.VERSION)}</p>
+      </section>`,
     inicio: () => `
       <section class="card">
-        <h1>Juego de Reposición</h1>
+        <img class="logo-mini" src="img/logo.png" alt="Cookie Production Fight!">
         <p class="ayuda">Fábrica, distribuidor y tienda, en 2 equipos de 3. Gana quien tenga más utilidad al final.</p>
         <h2>1. Elige tu avatar</h2>
         <div class="grid-av" id="grid-av">
@@ -162,15 +177,15 @@
       <p id="aviso" class="aviso"></p>
       <section class="card" id="dinero"></section>
       <section class="card">
-        <h2>🚚 Tu cadena</h2>
+        <h2><img class="ic-s" src="img/camion.png" alt="">Tu cadena</h2>
         <div class="cadena" id="cadena">
-          <div class="nodo"><span class="ic">⚙️</span><div class="ni"><b>Producción</b> <small id="t-prod"></small></div></div>
+          <div class="nodo"><img class="ic-g" src="img/engranaje.png" alt=""><div class="ni"><b>Producción</b> <small id="t-prod"></small></div></div>
           <div class="lane" id="lane-prod"></div>
-          <div class="nodo" id="n-fabrica"><span class="ic">🏭</span><div class="ni" id="i-fabrica"></div></div>
+          <div class="nodo" id="n-fabrica"><img class="esc-rol" src="img/fabrica.png" alt="Fábrica"><div class="ni" id="i-fabrica"></div></div>
           <div class="lane" id="lane-fd"></div>
-          <div class="nodo" id="n-distribuidor"><span class="ic">🏬</span><div class="ni" id="i-distribuidor"></div></div>
+          <div class="nodo" id="n-distribuidor"><img class="esc-rol" src="img/distribucion.png" alt="Distribuidor"><div class="ni" id="i-distribuidor"></div></div>
           <div class="lane" id="lane-dt"></div>
-          <div class="nodo" id="n-tienda"><span class="ic">🛍️</span><div class="ni" id="i-tienda"></div></div>
+          <div class="nodo" id="n-tienda"><img class="esc-rol" src="img/tienda.png" alt="Tienda"><div class="ni" id="i-tienda"></div></div>
           <div class="lane fija"><span id="t-ventas"></span></div>
           <div class="nodo"><span class="ic">🙋</span><div class="ni"><b>Clientes</b></div></div>
         </div>
@@ -357,7 +372,8 @@
     if (!b) return;
     try {
       const a = b.dataset.accion;
-      if (a === 'avatar') elegirAvatar(Number(b.dataset.id));
+      if (a === 'iniciar-juego') construir('inicio');
+      else if (a === 'avatar') elegirAvatar(Number(b.dataset.id));
       else if (a === 'crear') await crearSala();
       else if (a === 'solo') await jugarSolo();
       else if (a === 'bots') await completarBots();
@@ -551,7 +567,7 @@
         } else {
           cuerpo = `<button class="mini" data-accion="puesto" data-eq="${X}" data-rol="${rol}">Elegir este puesto</button>`;
         }
-        return `<div class="slot ${mio ? 'mio' : ''} ${j ? 'ocup' : ''}"><span class="rolnom">${ROLI[rol]} ${ROLN[rol]}</span><div>${cuerpo}</div></div>`;
+        return `<div class="slot ${mio ? 'mio' : ''} ${j ? 'ocup' : ''}"><span class="rolnom">${escena(rol, '')}${ROLN[rol]}</span><div>${cuerpo}</div></div>`;
       }).join('');
       return `<div class="colEq ${miEq === X ? 'miEq' : ''}"><h3>${esc(EQ[X])}${miEq === X ? ' (tu equipo)' : ''}</h3>${filas}</div>`;
     }).join('');
@@ -654,7 +670,7 @@
       const stk = suma(eq.stock[rol].map((L) => L.q));
       render($('i-' + rol), `
         <b>${ROLN[rol]}</b> ${j ? quienHtml(j) : ''}${rol === yo.rol ? ' <span class="tu">TÚ</span>' : ''}
-        <br><small>Almacén: <b>${num(stk)}</b> galletas · ${decidio ? '<span class="pos">✔ ya decidió</span>' : '⏳ decidiendo…'}</small>`);
+        <br><small>Almacén: <b>${num(stk)}</b> galletas · ${decidio ? `<span class="pos">${ic('checklist')}ya decidió</span>` : '⏳ decidiendo…'}</small>`);
       const n = $('n-' + rol);
       if (n) n.classList.toggle('mio', rol === yo.rol);
     });
@@ -687,7 +703,7 @@
         if (!el) {
           el = document.createElement('div');
           el.className = 'camion';
-          el.innerHTML = '<span class="cm">🚚</span><small></small>';
+          el.innerHTML = '<span class="cm"><img src="img/camion.png" alt=""></span><small></small>';
           el.style.top = (animar ? 0 : pos) + '%';
           if (animar) el.style.opacity = '0';
           lane.appendChild(el);
@@ -740,7 +756,7 @@
       const pCal = (i) => lim.calidad[i] || eq.calidad[i];
       const pProd = (i) => (pl.produccion !== undefined ? lim.produccion[i] : sugerido(i));
       const situacion = tabla(
-        ['Sabor', '📦 En almacén', '⚙️ Produciendo', '🚚 Entregando al distribuidor'],
+        ['Sabor', ic('paquete') + 'En almacén', ic('engranaje') + 'Produciendo', ic('camion') + 'Entregando al distribuidor'],
         PRODUCTOS.map((p, i) => [chip(p), num(stock[i]), dosSemanas('prod', i), dosSemanas('fd', i)])
       );
       const formulario = tabla(
@@ -759,8 +775,7 @@
             PRODUCTOS.map((p, i) => [chip(p), num(rep.pedidoFab[i]), num(rep.despFD[i]), num(rep.produccion[i])]))
         : '<p class="ayuda">Aquí verás lo que pidió el distribuidor cuando termine la primera semana.</p>';
       return `
-        <h2>Tu decisión · Fábrica</h2>
-        <p class="ayuda">Decides la calidad de cada sabor y cuánto producir. Lo que produces llega a tu almacén en 2 semanas.</p>
+        <div class="banner-rol">${escena('fabrica', '')}<div><h2>Tu decisión · Fábrica de galletas</h2><p class="ayuda">Decides la calidad de cada sabor y cuánto producir. Lo que produces llega a tu almacén en 2 semanas.</p></div></div>
         <h3>Tu situación ahora</h3>
         ${situacion}
         ${ultima}
@@ -775,7 +790,7 @@
       const sugerido = (i) => (rep ? rep.pedidoDist[i] : Math.round(PRODUCTOS[i].demMedia));
       const pPed = (i) => (pl.pedido !== undefined ? lim.pedidoFab[i] : sugerido(i));
       const situacion = tabla(
-        ['Sabor', '📦 En almacén', '⏳ Esperando de fábrica', '🚚 Entregando a la tienda'],
+        ['Sabor', ic('paquete') + 'En almacén', ic('camion') + 'Esperando de fábrica', ic('camion') + 'Entregando a la tienda'],
         PRODUCTOS.map((p, i) => [chip(p), num(stock[i]), dosSemanas('fd', i), dosSemanas('dt', i)])
       );
       const formulario = tabla(
@@ -792,8 +807,7 @@
             PRODUCTOS.map((p, i) => [chip(p), num(rep.pedidoDist[i]), num(rep.despDT[i]), num(rep.pedidoFab[i]), num(rep.despFD[i])]))
         : '';
       return `
-        <h2>Tu decisión · Distribuidor</h2>
-        <p class="ayuda">Decides cuánto pedir a fábrica y pujas por los influencers. Lo que pida la tienda sale de tu almacén.</p>
+        <div class="banner-rol">${escena('distribuidor', '')}<div><h2>Tu decisión · Centro de distribución</h2><p class="ayuda">Decides cuánto pedir a fábrica y pujas por los influencers. Lo que pida la tienda sale de tu almacén.</p></div></div>
         <h3>Tu situación ahora</h3>
         ${situacion}
         ${ultima}
@@ -808,7 +822,7 @@
     const pPre = (i) => (lim.precio[i] !== null ? lim.precio[i] : eq.precio[i]);
     const pPedT = (i) => (pl.pedido !== undefined ? lim.pedidoDist[i] : (rep ? rep.demanda[i] : Math.round(PRODUCTOS[i].demMedia)));
     const situacion = tabla(
-      ['Sabor', '📦 En almacén', '⏳ Esperando del distribuidor', 'Precio actual'],
+      ['Sabor', ic('paquete') + 'En almacén', ic('camion') + 'Esperando del distribuidor', 'Precio actual'],
       PRODUCTOS.map((p, i) => [chip(p), num(stock[i]), dosSemanas('dt', i), dinero2(eq.precio[i])])
     );
     const formulario = tabla(
@@ -827,8 +841,7 @@
             num(rep.vendido[i]), num(rep.perdidoFinal[i])]))
       : '<p class="ayuda">Aquí verás lo que pasó cuando termine la primera semana.</p>';
     return `
-      <h2>Tu decisión · Tienda final</h2>
-      <p class="ayuda">Decides el precio de cada sabor y cuánto pedir al distribuidor. Vendes a los clientes desde tu almacén.</p>
+      <div class="banner-rol">${escena('tienda', '')}<div><h2>Tu decisión · Tienda minorista</h2><p class="ayuda">Decides el precio de cada sabor y cuánto pedir al distribuidor. Vendes a los clientes desde tu almacén.</p></div></div>
       <h3>Tu situación ahora</h3>
       ${situacion}
       ${ultima}
@@ -993,7 +1006,7 @@
     const yo = datos.yo;
     const equipos = (ganador ? [ganador, ganador === 'A' ? 'B' : 'A'] : ['A', 'B']).map((X) => {
       const integrantes = ROLES.map((rol) => datos.jugadores.find((j) => j.equipo === X && j.rol === rol)).filter(Boolean)
-        .map((j) => `<div class="int">${avatar(j.avatar, 'med')} <div><b>${esc(j.nombre)}</b>${j.es_bot ? ' 🤖' : ''}<br><small>${ROLI[j.rol]} ${ROLN[j.rol]}</small></div></div>`).join('');
+        .map((j) => `<div class="int">${avatar(j.avatar, 'med')} <div><b>${esc(j.nombre)}</b>${j.es_bot ? ' 🤖' : ''}<br><small>${escena(j.rol, '')}${ROLN[j.rol]}</small></div></div>`).join('');
       const etiqueta = !ganador ? 'Empate' : X === ganador ? '🏆 Ganadores' : 'Perdedores';
       return `<div class="equipo ${ganador && X === ganador ? 'gana' : ''}"><h3>${esc(EQ[X])} · ${etiqueta}</h3>
         <p class="${total[X] >= 0 ? 'pos' : 'neg'}"><b>${money(total[X])}</b></p>${integrantes}</div>`;
@@ -1014,7 +1027,7 @@
   if (sala) {
     refrescar();
   } else {
-    construir('inicio');
+    construir('home');
   }
   setInterval(refrescar, 1200);
   setInterval(tick, 250);

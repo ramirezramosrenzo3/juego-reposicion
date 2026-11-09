@@ -3,18 +3,22 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#1d4ed8">
-  <title>Juego de Reposición</title>
+  <meta name="theme-color" content="#8B5E3C">
+  <title>Cookie Production Fight!</title>
+  <link rel="icon" href="img/galleta1.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Lilita+One&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
   <style>
     :root {
-      --azul: #1d4ed8;
-      --fondo: #f3f5f9;
-      --tarjeta: #ffffff;
-      --texto: #111827;
-      --gris: #6b7280;
-      --borde: #e5e7eb;
-      --verde: #15803d;
-      --rojo: #b91c1c;
+      --azul: #8B5E3C;
+      --fondo: #FFF7ED;
+      --tarjeta: #FFFDF9;
+      --texto: #4A2F1B;
+      --gris: #8C7566;
+      --borde: #E7DFD7;
+      --verde: #2E8B57;
+      --rojo: #C0392B;
     }
     * { box-sizing: border-box; }
     body {
@@ -48,7 +52,7 @@
       margin-top: 4px;
       padding: 10px;
       font-size: 16px;
-      border: 1px solid #cfd4dc;
+      border: 1px solid #D8C3AE;
       border-radius: 10px;
       background: #fff;
     }
@@ -67,7 +71,7 @@
     }
     button.principal { background: var(--azul); color: #fff; }
     button.principal:disabled { background: #9ca3af; cursor: not-allowed; }
-    button.secundario { background: #e5e7eb; color: var(--texto); }
+    button.secundario { background: #EFE3D3; color: var(--texto); }
     .barra {
       position: sticky;
       top: 0;
@@ -98,7 +102,7 @@
     table.form td { text-align: left; }
     table.conj td:nth-child(2) { min-width: 130px; }
     table.conj td:nth-child(3) { text-align: left; font-size: 0.85rem; }
-    tr.mio td { background: #eff6ff; }
+    tr.mio td { background: #FBEFDD; }
     .pos { color: var(--verde); font-weight: 600; }
     .neg { color: var(--rojo); font-weight: 600; }
     .chip {
@@ -130,18 +134,18 @@
     #rl-seg { font-size: 1.5rem; font-variant-numeric: tabular-nums; white-space: nowrap; min-width: 5.2ch; text-align: right; }
     .rl-barra { height: 5px; background: rgba(255,255,255,.3); border-radius: 3px; margin: 5px auto 0; max-width: 720px; overflow: hidden; }
     .rl-barra i { display: block; height: 100%; width: 100%; background: #fff; transform-origin: left; }
-    .reloj.rojo { background: #dc2626; }
+    .reloj.rojo { background: #C0392B; }
     body.con-reloj { padding-top: calc(62px + env(safe-area-inset-top)); }
     .toast {
       position: fixed; left: 50%; bottom: 24px; transform: translate(-50%, 80px); opacity: 0;
-      background: #111827; color: #fff; padding: 10px 16px; border-radius: 20px; z-index: 60;
+      background: #4A2F1B; color: #fff; padding: 10px 16px; border-radius: 20px; z-index: 60;
       transition: all .4s; pointer-events: none; font-weight: 600;
     }
     .toast.ver { transform: translate(-50%, 0); opacity: 1; }
 
     /* ---- avatares ---- */
     .av { flex: none; display: inline-flex; flex-direction: column; align-items: center; justify-content: center; position: relative;
-      width: 48px; height: 48px; border-radius: 50%; background: #e0e7ff; font-size: 1.7rem; line-height: 1; vertical-align: middle; }
+      width: 48px; height: 48px; border-radius: 50%; background: #F7E4C6; font-size: 1.7rem; line-height: 1; vertical-align: middle; }
     .av.con-img { background: none; border-radius: 0; }
     .av img { width: 100%; height: 100%; object-fit: contain; }
     .av i { position: absolute; right: -2px; bottom: -2px; background: var(--azul); color: #fff; font-style: normal;
@@ -152,8 +156,8 @@
     .av.grande { width: 140px; height: 140px; font-size: 4rem; }
     .av.grande i { font-size: 1rem; min-width: 28px; height: 28px; line-height: 28px; border-radius: 14px; }
     .grid-av { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
-    .grid-av .av-btn { margin: 0; padding: 6px 0; background: #f3f4f6; border: 2px solid transparent; border-radius: 12px; width: auto; }
-    .grid-av .av-btn.sel { border-color: var(--azul); background: #dbeafe; }
+    .grid-av .av-btn { margin: 0; padding: 6px 0; background: #F7EBDA; border: 2px solid transparent; border-radius: 12px; width: auto; }
+    .grid-av .av-btn.sel { border-color: var(--azul); background: #F5DDBE; }
     .perfil { text-align: center; margin-top: 10px; }
     .perfil[hidden], #pide-av[hidden] { display: none; }
     .perfil label { text-align: left; }
@@ -163,30 +167,30 @@
     /* ---- elección de puesto ---- */
     .dos-col { display: flex; gap: 10px; flex-wrap: wrap; }
     .colEq { flex: 1 1 250px; border: 2px solid var(--borde); border-radius: 12px; padding: 8px; }
-    .colEq.miEq { border-color: var(--azul); background: #eff6ff; }
+    .colEq.miEq { border-color: var(--azul); background: #FBEFDD; }
     .slot { padding: 8px; border-bottom: 1px solid var(--borde); }
     .slot:last-child { border-bottom: none; }
-    .slot.mio { background: #dbeafe; border-radius: 8px; }
+    .slot.mio { background: #F5DDBE; border-radius: 8px; }
     .slot.ocup { color: var(--gris); }
     .rolnom { display: block; font-weight: 700; margin-bottom: 4px; color: var(--texto); }
     button.mini { width: auto; padding: 8px 12px; margin: 2px 0; font-size: .9rem; background: var(--azul); color: #fff; }
-    button.mini.sec { background: #e5e7eb; color: var(--texto); }
+    button.mini.sec { background: #EFE3D3; color: var(--texto); }
 
     /* ---- dinero ---- */
     .dinero { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
     .dinero .gran { font-size: 2rem; font-weight: 800; font-variant-numeric: tabular-nums; }
     details.reglas summary { cursor: pointer; font-weight: 600; color: var(--azul); }
-    .estim { background: #fefce8; border: 1px solid #fde68a; border-radius: 10px; padding: 8px 10px; font-size: .92rem; }
+    .estim { background: #FFF3CC; border: 1px solid #FFD87A; border-radius: 10px; padding: 8px 10px; font-size: .92rem; }
     .estim:empty { display: none; }
 
     /* ---- cadena con camiones ---- */
     .cadena { padding: 4px 0; }
     .nodo { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border: 2px solid var(--borde); border-radius: 12px; background: #fff; min-height: 44px; }
-    .nodo.mio { border-color: var(--azul); background: #eff6ff; }
+    .nodo.mio { border-color: var(--azul); background: #FBEFDD; }
     .nodo .ic { font-size: 1.6rem; }
     .nodo .ni { line-height: 1.3; font-size: .92rem; }
     .tu { background: var(--azul); color: #fff; border-radius: 8px; padding: 0 6px; font-size: .7rem; font-weight: 700; }
-    .lane { position: relative; height: 80px; margin-left: 34px; border-left: 3px dashed #94a3b8; }
+    .lane { position: relative; height: 80px; margin-left: 34px; border-left: 3px dashed #B8A6B0; }
     .lane.fija { height: 30px; display: flex; align-items: center; padding-left: 12px; font-size: .85rem; color: var(--gris); }
     .camion { position: absolute; left: -17px; transform: translateY(-50%); display: flex; align-items: center; gap: 8px;
       white-space: nowrap; transition: top 1.2s ease-in-out, opacity 1s; }
@@ -195,8 +199,76 @@
 
     /* ---- pantalla final ---- */
     .equipo { border: 2px solid var(--borde); border-radius: 12px; padding: 10px; }
-    .equipo.gana { border-color: #eab308; background: #fefce8; }
+    .equipo.gana { border-color: #eab308; background: #FFF3CC; }
     .int { display: flex; align-items: center; gap: 10px; margin: 8px 0; }
+
+    /* ======== IDENTIDAD DE MARCA: Cookie Production Fight! ======== */
+    :root {
+      --crema: #F7E4C6; --caramelo: #D8A676; --rosa: #F7A4C6; --menta: #A8E6C1; --lila: #B6A0DA; --amarillo: #FFD87A;
+      --display: "Lilita One", "Arial Rounded MT Bold", "Trebuchet MS", sans-serif;
+      --cuerpo: "Nunito", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+    body {
+      font-family: var(--cuerpo);
+      background:
+        radial-gradient(circle at 8% 4%, rgba(247,164,198,.22) 0 90px, transparent 91px),
+        radial-gradient(circle at 96% 98%, rgba(168,230,193,.28) 0 110px, transparent 111px),
+        var(--fondo);
+      background-attachment: fixed;
+    }
+    h1, h2, button, .gran, #rl-seg, .codigo { font-family: var(--display); font-weight: 400; letter-spacing: .02em; }
+    h1 { font-size: 1.8rem; color: var(--azul); }
+    h2 { font-size: 1.3rem; color: var(--azul); }
+    h3 { font-family: var(--display); font-weight: 400; font-size: 1.05rem; color: var(--azul); }
+    .card { border-radius: 20px; box-shadow: 0 3px 0 var(--borde), 0 8px 18px rgba(139,94,60,.08); border: 2px solid var(--borde); }
+    input, select { border: 2px solid #D8C3AE; border-radius: 12px; background: #fff; color: var(--texto); font-family: var(--cuerpo); }
+    input:focus, select:focus { outline: none; border-color: var(--azul); box-shadow: 0 0 0 3px rgba(216,166,118,.35); }
+    th { color: var(--azul); }
+    td, th { border-bottom-color: #EFE3D3; }
+    /* Botones al estilo del botón "Producir" del Brand Board */
+    button { border-radius: 999px; border-bottom: 4px solid rgba(0,0,0,.18); transition: transform .08s, filter .15s; font-size: 1.1rem; }
+    button:active:not(:disabled) { transform: translateY(2px); border-bottom-width: 2px; }
+    button.principal { background: linear-gradient(#7FD08F, #4DAA6C); color: #fff; text-shadow: 0 1px 0 rgba(0,0,0,.25); }
+    button.secundario { background: linear-gradient(#FBB9D3, #F08DB5); color: #fff; text-shadow: 0 1px 0 rgba(0,0,0,.2); }
+    button.principal:disabled { background: #cdbfb3; text-shadow: none; }
+    button.mini { background: linear-gradient(#7FD08F, #4DAA6C); color: #fff; border-radius: 999px; }
+    button.mini.sec { background: #EFE3D3; color: var(--texto); text-shadow: none; }
+    .grid-av .av-btn { border-radius: 16px; border-bottom: 2px solid transparent; background: #FBEFDD; }
+    .grid-av .av-btn.sel { border-color: var(--azul); background: var(--amarillo); }
+    .tu { background: var(--rosa); color: #fff; }
+    .reloj { background: var(--azul); }
+    .reloj.rojo { background: #C0392B; }
+    .rl-barra i { background: var(--amarillo); }
+    .toast { font-family: var(--display); font-weight: 400; background: var(--azul); }
+    .nodo { border-radius: 16px; background: #fff; }
+    .nodo.mio { background: #FFF3CC; border-color: var(--caramelo); }
+    .estim { background: #FFF3CC; border-color: var(--amarillo); }
+    details.reglas summary { color: var(--azul); }
+    /* Imágenes oficiales */
+    .gal { width: 24px; height: 24px; object-fit: contain; vertical-align: middle; margin-right: 5px; }
+    .ic-s { width: 20px; height: 20px; object-fit: contain; vertical-align: -5px; margin-right: 3px; }
+    .esc-rol { width: 54px; height: 54px; object-fit: contain; flex: none; }
+    .nodo .esc-rol { width: 62px; height: 52px; }
+    .nodo .ic-g { width: 38px; height: 38px; object-fit: contain; flex: none; }
+    .camion .cm img { width: 38px; height: 30px; object-fit: contain; display: block; }
+    .banner-rol { display: flex; align-items: center; gap: 12px; background: #FBEFDD; border-radius: 16px; padding: 8px 12px; margin: 4px 0 8px; }
+    .banner-rol img { width: 92px; height: 78px; object-fit: contain; }
+    .banner-rol h2 { margin: 0; }
+    .banner-rol p { margin: 2px 0 0; }
+    .slot .rolnom img { width: 38px; height: 32px; object-fit: contain; vertical-align: middle; margin-right: 6px; }
+    .int small img { width: 22px; height: 20px; object-fit: contain; vertical-align: middle; }
+    /* Pantalla de bienvenida */
+    .home { position: relative; min-height: calc(100vh - 24px); display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 24px 8px; overflow: hidden; }
+    .home .logo { width: min(86vw, 380px); height: auto; filter: drop-shadow(0 6px 0 rgba(139,94,60,.18)); animation: flota 3.2s ease-in-out infinite; }
+    .logo-mini { display: block; width: min(70vw, 260px); margin: 2px auto 8px; }
+    .home .lema { font-family: var(--display); color: var(--azul); font-size: 1.15rem; margin: 10px 0 22px; }
+    .home .escenas { display: flex; align-items: flex-end; justify-content: center; gap: 4px; margin: 6px 0 24px; }
+    .home .escenas img { width: 29vw; max-width: 130px; height: auto; }
+    .home .btn-iniciar { width: min(78vw, 300px); font-size: 1.7rem; padding: 14px; margin: 6px 0; }
+    .home .deco { position: absolute; width: 46px; opacity: .75; animation: flota 4s ease-in-out infinite; pointer-events: none; }
+    .home .pie { color: var(--gris); font-size: .8rem; margin-top: 14px; }
+    @keyframes flota { 50% { transform: translateY(-7px); } }
+    @media (prefers-reduced-motion: reduce) { .home .logo, .home .deco { animation: none; } }
     @media (max-width: 480px) {
       table { font-size: 0.8rem; }
       th, td { padding: 6px 4px; }
@@ -217,7 +289,7 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <!-- Configuración: URL y clave de tu proyecto de Supabase -->
   <script src="config.js"></script>
-  <!-- Los 20 avatares -->
+  <!-- Los 16 avatares -->
   <script src="avatares.js"></script>
   <!-- Reglas del juego -->
   <script src="game.js"></script>

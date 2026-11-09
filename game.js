@@ -30,11 +30,11 @@
   };
 
   const PRODUCTOS = [
-    { id: 'chocolate', nombre: 'Chocolate', color: '#6b4226', capProd: 250, demMedia: 90 },
-    { id: 'vainilla',  nombre: 'Vainilla',  color: '#f1d98a', capProd: 220, demMedia: 80 },
-    { id: 'menta',     nombre: 'Menta',     color: '#5fc9a0', capProd: 200, demMedia: 70 },
-    { id: 'fresa',     nombre: 'Fresa',     color: '#e8566b', capProd: 180, demMedia: 60 },
-    { id: 'mora',      nombre: 'Mora',      color: '#6a3d9a', capProd: 160, demMedia: 50 },
+    { id: 'chocolate', nombre: 'Chocolate', color: '#8B5E3C', capProd: 250, demMedia: 90 },
+    { id: 'vainilla',  nombre: 'Vainilla',  color: '#F7E8D0', capProd: 220, demMedia: 80 },
+    { id: 'menta',     nombre: 'Menta',     color: '#A8E6C1', capProd: 200, demMedia: 70 },
+    { id: 'fresa',     nombre: 'Fresa',     color: '#F7A4C6', capProd: 180, demMedia: 60 },
+    { id: 'mora',      nombre: 'Mora',      color: '#8E4B77', capProd: 160, demMedia: 50 },
   ];
 
   const CALIDADES = {
