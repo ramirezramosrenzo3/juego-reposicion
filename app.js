@@ -126,7 +126,7 @@
         <img class="logo" src="img/logo.png" alt="Cookie Production Fight!">
         <p class="lema">Produce, distribuye y vende. ¡Supera a tu rival!</p>
         <div class="escenas"><img src="img/fabrica.png" alt=""><img src="img/distribucion.png" alt=""><img src="img/tienda.png" alt=""></div>
-        <button class="principal btn-iniciar" data-accion="iniciar-juego">INICIAR ▶</button>
+        <button class="principal btn-iniciar" data-accion="iniciar-juego">INICIAR</button>
         <p class="pie">Versión ${esc(JR.VERSION)}</p>
       </section>`,
     inicio: () => `
