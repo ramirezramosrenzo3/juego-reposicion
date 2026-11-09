@@ -22,7 +22,7 @@
     tasaMantenimiento: 0.03,       // 3% del valor del stock por semana
     probDesvioMin: 0.2,
     probDesvioMax: 0.6,
-    ruidoDemanda: 0.2,             // ±20% de variación de la demanda del mercado
+    ruidoDemanda: 0.3,             // ±30% de variación de la demanda del mercado
     tope: 500,                     // máximo de unidades por pedido
     topeMonto: 10000,              // máximo de una puja
     duracionInfluencer: 2,         // semanas que dura un influencer
@@ -44,9 +44,9 @@
   };
 
   const INFLUENCERS = {
-    A: { nombre: 'Influencer A', min: 0.15, max: 0.35 },
-    B: { nombre: 'Influencer B', min: 0.25, max: 0.45 },
-    C: { nombre: 'Influencer C', min: 0.35, max: 0.55 },
+    A: { nombre: 'Influencer A', min: 0.05, max: 0.12 },
+    B: { nombre: 'Influencer B', min: 0.08, max: 0.13 },
+    C: { nombre: 'Influencer C', min: 0.09, max: 0.16 },
   };
   const INF_KEYS = ['A', 'B', 'C'];
 
@@ -55,7 +55,7 @@
   const N = PRODUCTOS.length;
 
   // Versión del motor: se muestra en la sala para detectar celulares con reglas distintas
-  const VERSION = '3.2';
+  const VERSION = '4.1';
 
   // ---------- UTILIDADES ----------
   const zeros = () => Array(N).fill(0);

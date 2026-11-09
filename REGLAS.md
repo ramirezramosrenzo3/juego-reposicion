@@ -1,4 +1,4 @@
-# Reglas del juego de reposición (versión 3.2: avatares y elección de puesto)
+# Reglas del juego de reposición (versión 4.1)
 
 Esta es la referencia del juego. Los números exactos están en `game.js` (bloque `CONFIG`, `PRODUCTOS`, `CALIDADES`, `INFLUENCERS`). Si este documento y el código no coinciden, avísame para corregir uno de los dos.
 
@@ -33,7 +33,7 @@ Esta es la referencia del juego. Los números exactos están en `game.js` (bloqu
 | Fresa | 60 |
 | Mora | 50 |
 
-- La demanda media de cada sabor cambia cada semana: se multiplica por un número al azar entre 0.80 y 1.20, todos igual de probables. **Es la misma para los dos equipos.**
+- La demanda media de cada sabor cambia cada semana: se multiplica por un número al azar entre 0.70 y 1.30, todos igual de probables. **Es la misma para los dos equipos.**
 - Costo de producir una galleta con calidad estándar: **$2.00**.
 - Precio al cliente de partida: **$4.50** para todos los sabores.
 
@@ -73,7 +73,7 @@ Esta es la referencia del juego. Los números exactos están en `game.js` (bloqu
 
 Cada semana, para cada sabor:
 
-1. **Mercado del sabor:** demanda media × un número al azar entre 0.80 y 1.20. Es la misma para los dos equipos.
+1. **Mercado del sabor:** demanda media × un número al azar entre 0.70 y 1.30. Es la misma para los dos equipos.
 2. **Atractivo de cada equipo** = (precio de referencia $4.50 ÷ su precio)^1.8 × factor de calidad × factor de influencers.
 3. **Tamaño del mercado** = demanda del mercado × ((atractivo A + atractivo B) ÷ 2)^0.5.
 4. **Demanda de cada equipo** = tamaño del mercado × su atractivo ÷ (atractivo A + atractivo B), redondeada.
@@ -83,7 +83,7 @@ Qué significa en el juego:
 - Si un equipo sube su precio, pierde parte de su demanda y **esa demanda pasa al otro equipo**.
 - Si un equipo tiene mejor calidad o influencers, gana parte del mercado.
 - Si los dos bajan precios o tienen influencers, **el mercado total crece**.
-- El reparto es proporcional y sin azar. El azar está en el tamaño del mercado (±20%) y en el desvío de clientes (sección 10).
+- El reparto es proporcional y sin azar. El azar está en el tamaño del mercado (±30%) y en el desvío de clientes (sección 10).
 
 ## 10. Desvío de clientes
 
@@ -93,9 +93,9 @@ Qué significa en el juego:
 ## 11. Influencers (subasta)
 
 - Hay 3 influencers. Cada uno sube la demanda de **todos los sabores** del equipo que lo tiene:
-  - **A:** entre 15% y 35%.
-  - **B:** entre 25% y 45%.
-  - **C:** entre 35% y 55%.
+  - **A:** entre 5% y 12%.
+  - **B:** entre 8% y 13%.
+  - **C:** entre 9% y 16%.
 - Cada semana, el distribuidor de cada equipo puede pujar por cualquiera de los tres, por ninguno o por varios. **La puja es solo un monto** (de $1 a $10,000); no elige sabor. Pon 0 para no pujar.
 - Las pujas son **secretas**.
 - **Gana el monto más alto, y paga ese monto.** El que pierde no paga nada.
@@ -141,7 +141,7 @@ Estos valores no vienen de tu lista original; los propuse para que el juego func
 
 - Exponente de elasticidad del precio: 1.8.
 - Crecimiento del mercado total (exponente): 0.5.
-- Ruido de la demanda: ±20%.
+- Ruido de la demanda: ±30%.
 - Capacidad de producción por sabor (sección 6).
 - Pedido máximo por sabor: 500 unidades. Puja máxima: $10,000.
 - Desempate de la subasta por calidad promedio (sección 11).

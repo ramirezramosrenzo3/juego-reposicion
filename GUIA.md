@@ -154,7 +154,7 @@ Cada persona ve solo la pantalla de su rol:
 - **Distribuidor:** elige cuánto pedir a la fábrica (llega en 2 semanas) y, si quiere, **puja por los influencers** (ver abajo).
 - **Tienda final:** elige el precio de cada sabor (entre $2.50 y $8.00) y cuánto pedir al distribuidor (llega en 2 semanas).
 
-Todos los celulares deben mostrar la misma **versión del juego** (aparece en la sala de espera y al final de la partida, por ejemplo `3.2`). Si alguien ve otra, que recargue la página.
+Todos los celulares deben mostrar la misma **versión del juego** (aparece en la sala de espera y al final de la partida, por ejemplo `4.1`). Si alguien ve otra, que recargue la página.
 
 Cada semana:
 1. Escribe tu decisión y toca **Enviar decisión**. Puedes cambiarla mientras el tiempo corra, con **Actualizar decisión**.
@@ -174,9 +174,9 @@ Un bot es un jugador que maneja el juego. Ocupa un lugar de fábrica, distribuid
 - **Qué tan buenos son:** son un rival razonable, no un experto. En simulaciones atienden casi toda la demanda, quedan parejos entre ellos y le ganan siempre a un equipo que no hace nada. Los detalles están en `REGLAS.md`, sección 16.
 - **Importante:** las decisiones de los bots las envía el celular de las personas. Si todas las personas cierran la página, la partida se detiene hasta que alguien vuelva a abrirla.
 
-## Actualizar a la versión 3.2 (si ya tenías el juego funcionando)
+## Actualizar a la versión 4.1 (si ya tenías el juego funcionando)
 
-Mismos pasos que abajo, pero en el paso 2 sube **4 archivos y las carpetas `avatares` e `img`**: `index.html`, `game.js`, `app.js` y `avatares.js` (nunca `config.js`). La sala de espera debe decir **Versión del juego: 3.2**. Sube también la carpeta `avatares` (16 imágenes) con **Add file → Upload files**.
+Mismos pasos que abajo, pero en el paso 2 sube **4 archivos y las carpetas `avatares` e `img`**: `index.html`, `game.js`, `app.js` y `avatares.js` (nunca `config.js`). La sala de espera debe decir **Versión del juego: 4.1**. Sube también la carpeta `avatares` (16 imágenes) con **Add file → Upload files**.
 
 ## Actualizar a la versión 3.1 (si ya tenías el juego funcionando)
 
@@ -246,8 +246,8 @@ Para cambiar un número: en GitHub abre `game.js`, toca el ícono del lápiz, ca
 | "La sala no existe" | Revisa que el código esté bien escrito. Las letras no distinguen mayúsculas. |
 | "La partida ya empezó" | Solo puedes unirte antes de que el anfitrión toque **Iniciar partida**. |
 | "La sala ya tiene 6 jugadores" | Ya están completos y no hay bots que ceder. Crea otra sala. |
-| "Falta actualizar la base de datos…" o "Could not find the function … completar_bots" | Pega de nuevo el `supabase.sql` de la versión 3.2 en Supabase y toca **Run** (ver **Actualizar a la versión 3.1**). |
-| Los bots no deciden y la semana espera todo el tiempo | Revisa que al menos una persona tenga la página abierta y que todos tengan la misma versión (3.2). |
+| "Falta actualizar la base de datos…" o "Could not find the function … completar_bots" | Pega de nuevo el `supabase.sql` de la versión 4.1 en Supabase y toca **Run** (ver **Actualizar a la versión 3.1**). |
+| Los bots no deciden y la semana espera todo el tiempo | Revisa que al menos una persona tenga la página abierta y que todos tengan la misma versión (4.1). |
 | "Se acabó el tiempo de esta semana" | La semana ya se cerró. Espera a la siguiente. |
 | Error en rojo en el SQL de Supabase | Copia el mensaje completo y envíamelo. |
 | El proyecto de Supabase no responde | Los proyectos gratis se pausan tras una semana sin uso. Entra a Supabase y reactívalo. |

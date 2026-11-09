@@ -1,5 +1,5 @@
 /*
-  INTERFAZ DEL JUEGO (versión 3.2: avatares, elección de puesto, cronómetro fijo, camiones)
+  INTERFAZ DEL JUEGO (versión 4.1)
   Se conecta a Supabase (salas y decisiones) y usa game.js (las reglas) y avatares.js (los 16 avatares).
   Cada celular refresca cada 1.2 segundos y recalcula el estado completo.
 */
@@ -502,7 +502,8 @@
     const s = datos.sala;
     if (s.estado === 'espera') return pintarLobby();
     if (s.estado === 'eleccion') return pintarEleccion();
-    if (s.estado === 'terminado') return pintarFin();
+    // Si se leyó 'terminado' pero faltan semanas cerradas por leer, se espera a la próxima lectura
+    if (s.estado === 'terminado') return datos.rondas.length >= s.total_rondas ? pintarFin() : undefined;
     return pintarJuego();
   }
 
@@ -626,32 +627,20 @@
   function htmlDinero(yo, ult) {
     const X = yo.equipo;
     const R = X === 'A' ? 'B' : 'A';
-    const u = estado.equipos[X].utilidad;
-    const total = JR.sumaUtil(u);
+    const total = JR.sumaUtil(estado.equipos[X].utilidad);
     const totalR = JR.sumaUtil(estado.equipos[R].utilidad);
     const semana = ult ? ult.equipos[X].utilidadRonda : null;
     const dif = total - totalR;
     return `
       <h2>💰 Dinero de ${esc(EQ[X])}</h2>
-      <div class="dinero">
-        <span class="gran ${total >= 0 ? 'pos' : 'neg'}">${money(total)}</span>
-        <small>ganancia acumulada de tu equipo</small>
+      <div class="gran ${total >= 0 ? 'pos' : 'neg'}">${money(total)}</div>
+      <div class="cajas">
+        <div class="caja"><small>Ventas última semana</small><b>${semana ? money(semana.ventas) : '—'}</b></div>
+        <div class="caja"><small>Mantenimiento</small><b>${semana ? money(semana.mantenimiento) : '—'}</b></div>
       </div>
-      <p>${semana
-        ? `Última semana: <b class="${semana.total >= 0 ? 'pos' : 'neg'}">${money(semana.total)}</b> <small>(ventas ${money(semana.ventas)} − mantenimiento ${money(semana.mantenimiento)} − pujas ${money(semana.influencers)})</small>`
-        : 'Todavía no se cerró ninguna semana: empiezan en $0.'}</p>
-      <p>${esc(EQ[R])}: <b>${money(totalR)}</b> · ${dif === 0 ? 'van empatados' : dif > 0 ? `<span class="pos">vas ganando por ${money(dif)}</span>` : `<span class="neg">vas perdiendo por ${money(-dif)}</span>`}</p>
-      <details class="reglas">
-        <summary>¿Cómo funciona el dinero?</summary>
-        <ul>
-          <li>Empiezan en $0 y <b>no hay límite de caja</b>: puedes pedir y producir lo que quieras.</li>
-          <li><b>Producir o pedir no cuesta en el momento.</b> El costo de cada galleta se descuenta cuando se vende.</li>
-          <li>Lo que se vende suma: precio − costo de la galleta (es el "margen de ventas").</li>
-          <li>Lo guardado en almacén paga mantenimiento: 3% de su valor por semana (por eso conviene no acumular de más).</li>
-          <li>Las pujas por influencers solo se pagan si ganas, y se descuentan de tu ganancia.</li>
-          <li>Gana el equipo con más ganancia acumulada al final.</li>
-        </ul>
-      </details>`;
+      <p class="rival">${dif === 0 ? `Empatan con ${esc(EQ[R])}` : dif > 0
+        ? `<span class="pos">Vas ganando por ${money(dif)}</span> a ${esc(EQ[R])}`
+        : `<span class="neg">Vas perdiendo por ${money(-dif)}</span> ante ${esc(EQ[R])}`}</p>`;
   }
 
   // ---------- CADENA ANIMADA ----------
@@ -743,7 +732,8 @@
     const lim = JR.leerDecision({ [yo.rol]: pl });
     const cam = (clave, i, r) => suma(eq.enTransito[clave].filter((e) => e.p === i && remDe(e) === r).map((e) => e.q));
     const camTot = (clave, i) => cam(clave, i, 0) + cam(clave, i, 1);
-    const dosSemanas = (clave, i) => `${num(cam(clave, i, 0))} <small>al cerrar esta semana</small><br>${num(cam(clave, i, 1))} <small>al cerrar la próxima</small>`;
+    const llegan = (clave, i) => `<b>${num(cam(clave, i, 0))}</b> · ${num(cam(clave, i, 1))}`;
+    const subLlegan = '<br><small>esta sem · próx</small>';
     const stock = eq.stock[yo.rol].map((L) => L.q);
     const boton = `<button class="principal" data-accion="enviar-dec">${enviada ? 'Actualizar decisión' : 'Enviar decisión'}</button>`;
     const estadoEnvio = `<p class="estado">${enviada
@@ -756,8 +746,8 @@
       const pCal = (i) => lim.calidad[i] || eq.calidad[i];
       const pProd = (i) => (pl.produccion !== undefined ? lim.produccion[i] : sugerido(i));
       const situacion = tabla(
-        ['Sabor', ic('paquete') + 'En almacén', ic('engranaje') + 'Produciendo', ic('camion') + 'Entregando al distribuidor'],
-        PRODUCTOS.map((p, i) => [chip(p), num(stock[i]), dosSemanas('prod', i), dosSemanas('fd', i)])
+        ['Sabor', ic('paquete') + 'En almacén', ic('engranaje') + 'Produciendo' + subLlegan],
+        PRODUCTOS.map((p, i) => [chip(p), num(stock[i]), llegan('prod', i)])
       );
       const formulario = tabla(
         ['Sabor', 'Calidad', 'Producir (llega en 2 semanas)'],
@@ -773,14 +763,13 @@
         ? `<h3>🤝 Con el distribuidor (semana pasada)</h3>` + tabla(
             ['Sabor', 'Te pidió', 'Despachaste', 'Produjiste'],
             PRODUCTOS.map((p, i) => [chip(p), num(rep.pedidoFab[i]), num(rep.despFD[i]), num(rep.produccion[i])]))
-        : '<p class="ayuda">Aquí verás lo que pidió el distribuidor cuando termine la primera semana.</p>';
+        : '';
       return `
-        <div class="banner-rol">${escena('fabrica', '')}<div><h2>Tu decisión · Fábrica de galletas</h2><p class="ayuda">Decides la calidad de cada sabor y cuánto producir. Lo que produces llega a tu almacén en 2 semanas.</p></div></div>
+        <div class="banner-rol">${escena('fabrica', '')}<div><h2>Tu decisión · Fábrica</h2></div></div>
         <h3>Tu situación ahora</h3>
         ${situacion}
         ${ultima}
         <h3>Decide esta semana</h3>
-        <p class="ayuda">Te sugerimos producir lo que pidió el distribuidor la semana pasada. Puedes cambiarlo.</p>
         ${formulario}
         ${estim}
         ${boton}${estadoEnvio}`;
@@ -790,8 +779,8 @@
       const sugerido = (i) => (rep ? rep.pedidoDist[i] : Math.round(PRODUCTOS[i].demMedia));
       const pPed = (i) => (pl.pedido !== undefined ? lim.pedidoFab[i] : sugerido(i));
       const situacion = tabla(
-        ['Sabor', ic('paquete') + 'En almacén', ic('camion') + 'Esperando de fábrica', ic('camion') + 'Entregando a la tienda'],
-        PRODUCTOS.map((p, i) => [chip(p), num(stock[i]), dosSemanas('fd', i), dosSemanas('dt', i)])
+        ['Sabor', ic('paquete') + 'En almacén', ic('camion') + 'Esperando de fábrica' + subLlegan],
+        PRODUCTOS.map((p, i) => [chip(p), num(stock[i]), llegan('fd', i)])
       );
       const formulario = tabla(
         ['Sabor', 'Pedir a fábrica (llega en 2 semanas)'],
@@ -807,7 +796,7 @@
             PRODUCTOS.map((p, i) => [chip(p), num(rep.pedidoDist[i]), num(rep.despDT[i]), num(rep.pedidoFab[i]), num(rep.despFD[i])]))
         : '';
       return `
-        <div class="banner-rol">${escena('distribuidor', '')}<div><h2>Tu decisión · Centro de distribución</h2><p class="ayuda">Decides cuánto pedir a fábrica y pujas por los influencers. Lo que pida la tienda sale de tu almacén.</p></div></div>
+        <div class="banner-rol">${escena('distribuidor', '')}<div><h2>Tu decisión · Distribuidor</h2></div></div>
         <h3>Tu situación ahora</h3>
         ${situacion}
         ${ultima}
@@ -822,8 +811,8 @@
     const pPre = (i) => (lim.precio[i] !== null ? lim.precio[i] : eq.precio[i]);
     const pPedT = (i) => (pl.pedido !== undefined ? lim.pedidoDist[i] : (rep ? rep.demanda[i] : Math.round(PRODUCTOS[i].demMedia)));
     const situacion = tabla(
-      ['Sabor', ic('paquete') + 'En almacén', ic('camion') + 'Esperando del distribuidor', 'Precio actual'],
-      PRODUCTOS.map((p, i) => [chip(p), num(stock[i]), dosSemanas('dt', i), dinero2(eq.precio[i])])
+      ['Sabor', ic('paquete') + 'En almacén', ic('camion') + 'Esperando del distribuidor' + subLlegan],
+      PRODUCTOS.map((p, i) => [chip(p), num(stock[i]), llegan('dt', i)])
     );
     const formulario = tabla(
       ['Sabor', 'Precio al cliente ($2.50 a $8.00)', 'Pedir al distribuidor (llega en 2 semanas)'],
@@ -839,14 +828,13 @@
           ['Sabor', 'Tú pediste', 'Distribuidor despachó', 'Demanda', 'Vendido', 'Perdido'],
           PRODUCTOS.map((p, i) => [chip(p), num(rep.pedidoDist[i]), num(rep.despDT[i]), num(rep.demanda[i]),
             num(rep.vendido[i]), num(rep.perdidoFinal[i])]))
-      : '<p class="ayuda">Aquí verás lo que pasó cuando termine la primera semana.</p>';
+      : '';
     return `
-      <div class="banner-rol">${escena('tienda', '')}<div><h2>Tu decisión · Tienda minorista</h2><p class="ayuda">Decides el precio de cada sabor y cuánto pedir al distribuidor. Vendes a los clientes desde tu almacén.</p></div></div>
+      <div class="banner-rol">${escena('tienda', '')}<div><h2>Tu decisión · Tienda minorista</h2></div></div>
       <h3>Tu situación ahora</h3>
       ${situacion}
       ${ultima}
       <h3>Precio y pedido</h3>
-      <p class="ayuda">Un precio más alto baja tu parte de la demanda y la pasa a la otra tienda. Te sugerimos pedir lo que se demandó la semana pasada.</p>
       ${formulario}
       ${estim}
       ${boton}${estadoEnvio}`;
@@ -863,13 +851,14 @@
       const cal = Array.from(document.querySelectorAll('#mi .cal')).map((x) => CALIDADES[x.value] ? CALIDADES[x.value].costo : 1);
       const prod = v('#mi .prod');
       const costo = suma(prod.map((q, i) => q * CONFIG.costoBase * (cal[i] || 1)));
-      txt = `Vas a producir <b>${num(suma(prod))}</b> galletas. Costo total: <b>${money(costo)}</b> (se descuenta de la ganancia cuando se vendan, no ahora).`;
+      txt = `Vas a producir <b>${num(suma(prod))}</b> galletas. Costo total: <b>${money(costo)}</b> (se descuenta cuando se vendan). Guardar una galleta en tu almacén cuesta ${dinero2(CONFIG.costoBase * CONFIG.tasaMantenimiento)} por semana.`;
     } else if (yo.rol === 'distribuidor') {
       const ped = v('#mi .ped');
       const pujas = v('#mi .pm');
       const maxPuja = suma(pujas);
       txt = `Pedirás <b>${num(suma(ped))}</b> galletas a fábrica.` +
-        (maxPuja > 0 ? ` Tus pujas suman <b>${money(maxPuja)}</b>: solo pagas las que ganes.` : ' No estás pujando.');
+        (maxPuja > 0 ? ` Tus pujas suman <b>${money(maxPuja)}</b> (solo pagas las que ganes).` : ' No estás pujando.') +
+        ` Guardar una galleta en tu almacén cuesta ${dinero2(CONFIG.precioFab * CONFIG.tasaMantenimiento)} por semana.`;
     } else {
       const ped = v('#mi .ped');
       txt = `Pedirás <b>${num(suma(ped))}</b> galletas al distribuidor. Guardar una galleta en tu almacén cuesta ${dinero2(CONFIG.precioDist * CONFIG.tasaMantenimiento)} por semana.`;
@@ -918,14 +907,13 @@
 
   function htmlUlt(yo, ult) {
     if (!ult) {
-      return '<h2>Resultados</h2><p class="ayuda">Aquí verás los resultados de tu equipo al terminar la primera semana.</p>';
+      return '';
     }
     const r = ult.equipos[yo.equipo];
     const u = r.utilidadRonda;
     let html = `
       <h2>Última semana (${ult.ronda}) · ${esc(EQ[yo.equipo])}</h2>
-      <p>Ganancia del equipo esta semana: <b class="${u.total >= 0 ? 'pos' : 'neg'}">${money(u.total)}</b></p>
-      <p class="ayuda">Margen de ventas ${money(u.ventas)} − mantenimiento ${money(u.mantenimiento)} − pujas pagadas ${money(u.influencers)}</p>`;
+      <p>Ganancia del equipo esta semana: <b class="${u.total >= 0 ? 'pos' : 'neg'}">${money(u.total)}</b></p>`;
 
     if (yo.rol === 'distribuidor') {
       const prev = datos.decisiones.find((x) => x.ronda === ult.ronda && x.equipo === yo.equipo && x.rol === 'distribuidor');
@@ -947,18 +935,15 @@
 
   function htmlMarc(yo, ult) {
     const filas = JR.EQUIPOS.map((X) => {
-      const u = estado.equipos[X].utilidad;
       const semana = ult ? ult.equipos[X].utilidadRonda.total : 0;
       return [
         `${esc(EQ[X])}${yo && X === yo.equipo ? ' (tú)' : ''}`,
-        money(u.ventas), money(u.mantenimiento), money(u.influencers),
-        `<b>${money(JR.sumaUtil(u))}</b>`, money(semana),
+        `<b>${money(JR.sumaUtil(estado.equipos[X].utilidad))}</b>`, money(semana),
       ];
     });
     return `
       <h2>Marcador</h2>
-      ${tabla(['Equipo', 'Margen de ventas', 'Mantenimiento', 'Pujas pagadas', 'Total', 'Última semana'], filas)}
-      <p class="ayuda">Gana el equipo con más total al terminar la partida.</p>`;
+      ${tabla(['Equipo', 'Total', 'Última semana'], filas)}`;
   }
 
   // ---------- CRONÓMETRO FIJO ----------

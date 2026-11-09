@@ -1,4 +1,4 @@
-// PRUEBAS AUTOMÁTICAS DEL MOTOR (versión 3.2: con bots)
+// PRUEBAS AUTOMÁTICAS DEL MOTOR (versión 4.1)
 // Ejecutar con:  node test.js
 'use strict';
 const J = require('./game.js');
@@ -258,14 +258,14 @@ seccion('7. Traducción de decisiones (filas de la base -> motor)');
   ok(Object.keys(out[0].A).length === 1, 'un rol desconocido o una semana fuera de rango se ignora');
 }
 {
-  // Ruido de la demanda: uniforme dentro de ±20% de la media
+  // Ruido de la demanda: uniforme dentro de ±30% de la media
   const e = reproducir(4242, bot(77, 40));
   let dentro = true;
   e.historial.forEach((h) => PRODUCTOS.forEach((p, i) => {
     const f = h.base[i] / p.demMedia;
-    if (f < 0.79 || f > 1.21) dentro = false;
+    if (f < 0.69 || f > 1.31) dentro = false;
   }));
-  ok(dentro, 'la demanda del mercado siempre queda dentro de ±20% de la media');
+  ok(dentro, 'la demanda del mercado siempre queda dentro de ±30% de la media');
 }
 {
   // Empate por calidad con sumas que dan decimales distintos: sigue siendo un empate real
