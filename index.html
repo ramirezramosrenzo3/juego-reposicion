@@ -283,6 +283,31 @@
       th, td { padding: 6px 4px; }
       th { font-size: 0.72rem; white-space: normal; }
     }
+
+    /* ---- Eventos aleatorios ---- */
+    .evento { position: fixed; inset: 0; z-index: 200; display: flex; align-items: center; justify-content: center;
+      background: rgba(60, 38, 22, 0.78); padding: 16px; animation: ev-in .35s ease; }
+    .evento[hidden] { display: none; }
+    @keyframes ev-in { from { opacity: 0; } to { opacity: 1; } }
+    .ev-card { background: var(--crema, #FFF8EC); border-radius: 18px; width: 100%; max-width: 420px; max-height: 92vh; overflow: auto;
+      padding: 0 18px 16px; text-align: center; box-shadow: 0 12px 40px rgba(0,0,0,.4); position: relative; }
+    .ev-barra { height: 8px; margin: 0 -18px 14px; background: rgba(139,94,60,.18); overflow: hidden; border-radius: 18px 18px 0 0; }
+    .ev-barra i { display: block; height: 100%; background: var(--azul); transform-origin: left; transform: scaleX(1); }
+    .ev-icono { width: 120px; height: 120px; object-fit: contain; }
+    .ev-card h2 { margin: 6px 0; font-size: 1.3rem; color: var(--azul); }
+    .ev-desc { margin: 0 0 12px; font-size: .95rem; }
+    .ev-efectos { display: flex; flex-direction: column; gap: 6px; }
+    .ev-ef { display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-radius: 10px; background: #fff; text-align: left; }
+    .ev-ef img { width: 26px; height: 26px; object-fit: contain; }
+    .ev-ef span { flex: 1; }
+    .ev-ef.sube b { color: var(--verde); }
+    .ev-ef.baja b { color: var(--rojo); }
+    .ev-op { background: #fff; border-radius: 10px; padding: 10px; font-weight: 600; margin-top: 4px; text-align: left; }
+    .ev-pie { margin-top: 10px; font-weight: 700; color: var(--azul); }
+    .ev-mini { display: flex; gap: 12px; align-items: flex-start; }
+    .ev-mini > img { width: 48px; height: 48px; object-fit: contain; flex: none; }
+    .ev-mini .ev-ef { padding: 3px 8px; font-size: .85rem; }
+    body.con-evento { overflow: hidden; }
   </style>
 </head>
 <body>
@@ -292,6 +317,7 @@
     <div class="rl-barra"><i id="rl-prog"></i></div>
   </div>
   <div id="toast" class="toast"></div>
+  <div id="evento" class="evento" hidden></div>
   <div id="app"></div>
 
   <!-- Supabase (base de datos y tiempo real) -->

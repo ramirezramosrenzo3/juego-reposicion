@@ -154,7 +154,7 @@ Cada persona ve solo la pantalla de su rol:
 - **Distribuidor:** elige cuánto pedir a la fábrica (llega en 2 semanas) y, si quiere, **puja por los influencers** (ver abajo).
 - **Tienda final:** elige el precio de cada sabor (entre $2.50 y $8.00) y cuánto pedir al distribuidor (llega en 2 semanas).
 
-Todos los celulares deben mostrar la misma **versión del juego** (aparece en la sala de espera y al final de la partida, por ejemplo `4.1`). Si alguien ve otra, que recargue la página.
+Todos los celulares deben mostrar la misma **versión del juego** (aparece en la sala de espera y al final de la partida, por ejemplo `4.2.1`). Si alguien ve otra, que recargue la página.
 
 Cada semana:
 1. Escribe tu decisión y toca **Enviar decisión**. Puedes cambiarla mientras el tiempo corra, con **Actualizar decisión**.
@@ -173,6 +173,29 @@ Un bot es un jugador que maneja el juego. Ocupa un lugar de fábrica, distribuid
 - **Qué hacen:** la fábrica produce en calidad estándar; el distribuidor y la tienda piden para tener unas 4 semanas de la demanda reciente; la tienda vende a $4.50; el distribuidor puja por influencers libres solo si la tienda tiene stock para atender más demanda.
 - **Qué tan buenos son:** son un rival razonable, no un experto. En simulaciones atienden casi toda la demanda, quedan parejos entre ellos y le ganan siempre a un equipo que no hace nada. Los detalles están en `REGLAS.md`, sección 16.
 - **Importante:** las decisiones de los bots las envía el celular de las personas. Si todas las personas cierran la página, la partida se detiene hasta que alguien vuelva a abrirla.
+
+## Actualizar a la versión 4.2.1 (eventos aleatorios)
+
+1. **Primero la base de datos:** en Supabase > SQL Editor pega TODO el `supabase.sql` nuevo y toca **Run** (crea la tabla `extras` y las funciones del tiempo extra; no borra partidas).
+2. **Después los archivos:** en GitHub sube `index.html`, `game.js`, `app.js` y la carpeta **`img/eventos`** (9 imágenes). Nunca `config.js`.
+3. La sala de espera debe decir **Versión del juego: 4.2.1**.
+
+### Eventos aleatorios
+Desde la **semana 5** puede aparecer un evento (30 % de probabilidad; sube 5 puntos cada semana que no sale, hasta 100 %). Al aparecer, vuelve a 30 % y espera 5 semanas. Nunca hay dos a la vez. Todos los celulares ven el mismo evento a la vez, con una presentación obligatoria de 10 segundos (sin botón para cerrarla); el servidor agrega 10 segundos a esa semana para que nadie pierda tiempo de decisión.
+
+| Evento | Duración | Efecto sobre la demanda |
+|---|---|---|
+| Navidad | 4 semanas | Chocolate +20 %, Vainilla +20 %, Mora −10 % |
+| MAINCRA | 4 | Chocolate, Vainilla, Menta, Fresa −15 %; Mora +5 % |
+| Cyber Galletas | 4 | Fresa +10 %, Vainilla +10 %, Mora +4 % |
+| COVID-20 | 4 | Chocolate −7 %, Vainilla −7 % |
+| Fenómeno del Niño | 4 | Chocolate −16 %, Fresa +12 %, Mora +5 % |
+| Mochila perdida | 4 | Menta −11 %, Vainilla −11 % |
+| Happy Cookies | 4 | Menta +19 %; los demás −3 % |
+| ¡¡¡ALERTA MUFFIN!!! | 4 | Chocolate, Vainilla, Mora −9 % |
+| Huelga de transportistas | 1 semana | Sin cambio de demanda: esa semana no llega nada; lo pendiente se suma a la semana siguiente (no se pierde ni se duplica) |
+
+Los efectos son temporales y se aplican sobre la demanda base. Los iconos están en `img/eventos` (puedes reemplazar una imagen con el mismo nombre).
 
 ## Actualizar a la versión 4.1 (si ya tenías el juego funcionando)
 
@@ -246,8 +269,8 @@ Para cambiar un número: en GitHub abre `game.js`, toca el ícono del lápiz, ca
 | "La sala no existe" | Revisa que el código esté bien escrito. Las letras no distinguen mayúsculas. |
 | "La partida ya empezó" | Solo puedes unirte antes de que el anfitrión toque **Iniciar partida**. |
 | "La sala ya tiene 6 jugadores" | Ya están completos y no hay bots que ceder. Crea otra sala. |
-| "Falta actualizar la base de datos…" o "Could not find the function … completar_bots" | Pega de nuevo el `supabase.sql` de la versión 4.1 en Supabase y toca **Run** (ver **Actualizar a la versión 3.1**). |
-| Los bots no deciden y la semana espera todo el tiempo | Revisa que al menos una persona tenga la página abierta y que todos tengan la misma versión (4.1). |
+| "Falta actualizar la base de datos…" o "Could not find the function … completar_bots" | Pega de nuevo el `supabase.sql` de la versión 4.2.1 en Supabase y toca **Run** (ver **Actualizar a la versión 3.1**). |
+| Los bots no deciden y la semana espera todo el tiempo | Revisa que al menos una persona tenga la página abierta y que todos tengan la misma versión (4.2.1). |
 | "Se acabó el tiempo de esta semana" | La semana ya se cerró. Espera a la siguiente. |
 | Error en rojo en el SQL de Supabase | Copia el mensaje completo y envíamelo. |
 | El proyecto de Supabase no responde | Los proyectos gratis se pausan tras una semana sin uso. Entra a Supabase y reactívalo. |

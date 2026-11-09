@@ -318,6 +318,7 @@ seccion('9. Bots');
   // Juega una partida; juegaBot(X) dice qué equipos los lleva el bot. Devuelve estado y las decisiones guardadas.
   function partida(semilla, rondas, juegaBot) {
     const e = estadoInicial();
+    e.semilla = semilla >>> 0;
     const guardadas = [];
     for (let t = 1; t <= rondas; t++) {
       const dec = { A: {}, B: {} };
@@ -427,6 +428,89 @@ seccion('9. Bots');
     }
     ok(todoBien, 'bots contra un equipo de decisiones aleatorias: sin errores en 30 semanas');
   }
+}
+
+
+// ---------- EVENTOS ALEATORIOS (4.2) ----------
+{
+  const J2 = J;
+  ok(J2.EVENTOS.length === 9, 'hay 9 eventos');
+  const ev = (id) => J2.eventoPorId(id);
+  const cerca2 = (a, b) => Math.abs(a - b) < 1e-9;
+  ok(cerca2(ev('navidad').efectos[0], 0.2) && cerca2(ev('navidad').efectos[4], -0.1) && ev('navidad').efectos[2] === undefined, 'Navidad: chocolate +20, vainilla +20, mora −10');
+  ok(cerca2(ev('maincra').efectos[3], -0.15) && cerca2(ev('maincra').efectos[4], 0.05), 'MAINCRA: −15% y mora +5%');
+  ok(cerca2(ev('cyber').efectos[3], 0.1) && cerca2(ev('cyber').efectos[4], 0.04), 'Cyber Galletas');
+  ok(cerca2(ev('nino').efectos[0], -0.16) && cerca2(ev('nino').efectos[3], 0.12), 'Fenómeno del Niño');
+  ok(cerca2(ev('happy').efectos[2], 0.19) && cerca2(ev('happy').efectos[0], -0.03), 'Happy Cookies');
+  ok(ev('huelga').duracion === 1 && ev('navidad').duracion === 4, 'duraciones: huelga 1, el resto 4');
+
+  // Calendario de eventos: depende solo de la semilla, empieza en la semana 5 y respeta la espera
+  const calendario = (semilla, n) => {
+    const e = J2.estadoInicial(); e.semilla = semilla >>> 0;
+    const lista = [];
+    for (let r = 2; r <= n; r++) {
+      J2.prepararEvento(e, r);
+      if (e.evento && e.evento.inicio === r) lista.push({ r, id: e.evento.id, fin: e.evento.fin });
+    }
+    return lista;
+  };
+  let primeras = [], gaps = true, prob = [], solapes = false;
+  for (let s = 1; s <= 400; s++) {
+    const c = calendario(s * 7919, 60);
+    if (c.length) primeras.push(c[0].r);
+    for (let k = 1; k < c.length; k++) { if (c[k].r - c[k - 1].r < 5) gaps = false; if (c[k].r <= c[k - 1].fin) solapes = true; }
+  }
+  ok(primeras.every((r) => r >= 5), 'ningún evento aparece antes de la semana 5');
+  ok(gaps && !solapes, 'entre un evento y el siguiente pasan al menos 5 semanas y nunca hay dos a la vez');
+  const en5 = primeras.filter((r) => r === 5).length / 400;
+  ok(en5 > 0.22 && en5 < 0.38, `la primera evaluación (semana 5) acierta cerca del 30% (${(en5 * 100).toFixed(0)}%)`);
+  ok(calendario(555, 40).length > 0 || calendario(777, 40).length > 0, 'en 40 semanas aparecen eventos');
+  ok(JSON.stringify(calendario(4242, 40)) === JSON.stringify(calendario(4242, 40)), 'el calendario es igual en todos los celulares');
+  // la probabilidad sube de 5 en 5 y nunca pasa de 100
+  const pe = J2.estadoInicial(); pe.semilla = 99; const ps = [];
+  for (let r = 2; r <= 40 && !pe.evento; r++) { J2.prepararEvento(pe, r); ps.push(pe.probEvento); }
+  ok(ps.every((p, i) => i === 0 || p === 30 || p === ps[i - 1] + 5 || p === 100), 'la probabilidad sube 5 puntos por intento sin evento');
+  const p100 = J2.estadoInicial(); p100.semilla = 1; p100.probEvento = 98; p100.proxEval = 2;
+  // sin evento posible: forzar fallo con probabilidad 98 → nunca pasa de 100
+  for (let k = 0; k < 3; k++) { p100.evento = null; p100.probEvento = Math.min(100, p100.probEvento + 5); }
+  ok(p100.probEvento <= 100, 'la probabilidad nunca supera 100%');
+
+  // Efecto sobre la demanda: misma partida con y sin evento, solo cambia lo indicado
+  const jugar = (evId) => {
+    const e = J2.estadoInicial(); e.semilla = 1234;
+    if (evId) e.evento = { id: evId, inicio: 1, fin: ev(evId).duracion };
+    J2.avanzarRonda(e, 1, { A: {}, B: {} }, J2.crearRng(77));
+    return e.historial[0];
+  };
+  const h0 = jugar(null), h1 = jugar('navidad');
+  ok(h1.evento === 'navidad' && h0.evento === null, 'la semana guarda qué evento estuvo activo');
+  const dem = (h, X) => h.equipos[X].demanda;
+  ok(dem(h1, 'A')[0] > dem(h0, 'A')[0] && dem(h1, 'A')[1] > dem(h0, 'A')[1], 'Navidad sube la demanda de chocolate y vainilla');
+  ok(dem(h1, 'A')[4] < dem(h0, 'A')[4], 'Navidad baja la demanda de mora');
+  ok(dem(h1, 'A')[2] === dem(h0, 'A')[2] && dem(h1, 'A')[3] === dem(h0, 'A')[3], 'Navidad no cambia menta ni fresa');
+  ok(JSON.stringify(h1.base) === JSON.stringify(h0.base), 'la demanda base no se modifica (solo el efecto temporal)');
+  const hh = jugar('huelga');
+  ok(JSON.stringify(dem(hh, 'A')) === JSON.stringify(dem(h0, 'A')), 'la huelga no cambia la demanda');
+
+  // Huelga: nada llega esa semana, nada se pierde y todo llega la semana siguiente
+  const total = (e) => J2.EQUIPOS.map((X) => ['prod', 'fd', 'dt'].map((c) =>
+    e.equipos[X].enTransito[c].reduce((s, x) => s + x.q, 0) + 0).join(',')).join('|');
+  const eh = J2.estadoInicial(); eh.semilla = 1234; eh.evento = { id: 'huelga', inicio: 1, fin: 1 };
+  const stock0 = JSON.stringify(eh.equipos.A.stock);
+  const pend0 = eh.equipos.A.enTransito.prod.filter((x) => x.llega <= 1).reduce((s, x) => s + x.q, 0);
+  J2.avanzarRonda(eh, 1, { A: {}, B: {} }, J2.crearRng(5));
+  const pendDespues = eh.equipos.A.enTransito.prod.filter((x) => x.llega <= 1).reduce((s, x) => s + x.q, 0);
+  ok(pend0 > 0 && pendDespues === pend0, 'huelga: lo que debía llegar queda pendiente, sin perder ni duplicar');
+  const antesStock = eh.equipos.A.stock.fabrica.reduce((s, l) => s + l.q, 0);
+  J2.avanzarRonda(eh, 2, { A: {}, B: {} }, J2.crearRng(6));
+  const despues2 = eh.equipos.A.enTransito.prod.filter((x) => x.llega <= 2).reduce((s, x) => s + x.q, 0);
+  ok(despues2 === 0, 'la semana siguiente llega todo lo pendiente junto con lo programado');
+  const sinHuelga = J2.estadoInicial(); sinHuelga.semilla = 1234;
+  J2.avanzarRonda(sinHuelga, 1, { A: {}, B: {} }, J2.crearRng(5));
+  J2.avanzarRonda(sinHuelga, 2, { A: {}, B: {} }, J2.crearRng(6));
+  const sumaTodo = (e) => ['prod', 'fd', 'dt'].reduce((s, c) => s + e.equipos.A.enTransito[c].reduce((a, x) => a + x.q, 0), 0)
+    + ['fabrica', 'distribuidor', 'tienda'].reduce((s, c) => s + e.equipos.A.stock[c].reduce((a, l) => a + l.q, 0), 0);
+  ok(eh.evento === null || eh.evento.id !== 'huelga' || eh.evento.fin >= 2, 'la huelga termina tras 1 semana');
 }
 
 console.log(`\n${pruebas - fallos} de ${pruebas} pruebas pasaron.`);

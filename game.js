@@ -55,7 +55,7 @@
   const N = PRODUCTOS.length;
 
   // Versión del motor: se muestra en la sala para detectar celulares con reglas distintas
-  const VERSION = '4.1';
+  const VERSION = '4.2.1';
 
   // ---------- UTILIDADES ----------
   const zeros = () => Array(N).fill(0);
@@ -96,6 +96,59 @@
   }
 
   // ---------- ESTADO INICIAL ----------
+
+  // ---------- EVENTOS ALEATORIOS (versión 4.2) ----------
+  // efectos: cambio porcentual de la demanda del mercado por sabor, en el orden de PRODUCTOS
+  // (chocolate, vainilla, menta, fresa, mora). Los sabores que no aparecen no cambian.
+  const EVENTOS = [
+    { id: 'navidad', nombre: 'Navidad', duracion: 4, efectos: { 0: 0.20, 1: 0.20, 4: -0.10 },
+      desc: '¡Llegó la Navidad! Las personas se preparan para celebrar las fiestas y aumenta el consumo de galletas tradicionales.' },
+    { id: 'maincra', nombre: 'MAINCRA', duracion: 4, efectos: { 0: -0.15, 1: -0.15, 2: -0.15, 3: -0.15, 4: 0.05 },
+      desc: '¡Se descubrieron ratas en la cocina! La noticia se ha extendido rápidamente y los clientes han perdido la confianza en los productos.' },
+    { id: 'cyber', nombre: 'Cyber Galletas', duracion: 4, efectos: { 3: 0.10, 1: 0.10, 4: 0.04 },
+      desc: '¡Llegaron las ofertas de Cyber Galletas! Las promociones digitales han despertado el interés de los consumidores por algunos sabores.' },
+    { id: 'covid', nombre: 'COVID-20', duracion: 4, efectos: { 0: -0.07, 1: -0.07 },
+      desc: '¡Una pequeña gripe se ha extendido por el mundo! La preocupación por la salud y las compras de emergencia hacen que las personas prefieran comprar papel higiénico en lugar de galletas.' },
+    { id: 'nino', nombre: 'Fenómeno del Niño', duracion: 4, efectos: { 0: -0.16, 3: 0.12, 4: 0.05 },
+      desc: '¡Hace tanto calor que el chocolate se derrite! Los consumidores comienzan a preferir sabores más refrescantes para combatir las altas temperaturas.' },
+    { id: 'mochila', nombre: 'Mochila perdida', duracion: 4, efectos: { 2: -0.11, 1: -0.11 },
+      desc: 'Durante un paseo escolar se perdió una mochila llena de galletas. El incidente ha generado preocupación entre los estudiantes y sus familias.' },
+    { id: 'happy', nombre: 'Happy Cookies', duracion: 4, efectos: { 2: 0.19, 0: -0.03, 1: -0.03, 3: -0.03, 4: -0.03 },
+      desc: '¡El sabor de la menta ya no es menta...! Un cambio inesperado en la percepción del producto ha despertado la curiosidad de los consumidores.' },
+    { id: 'muffin', nombre: '¡¡¡ALERTA MUFFIN!!!', duracion: 4, efectos: { 0: -0.09, 1: -0.09, 4: -0.09 },
+      desc: '¡Ha llegado un nuevo competidor al mercado! Una nueva empresa comienza a vender MUFFINS y amenaza con quitarle clientes al negocio de las galletas.' },
+    { id: 'huelga', nombre: 'Huelga de transportistas', duracion: 1, efectos: {}, logistico: true,
+      desc: '¡Han cerrado toda circulación desde Ica hasta Lima! La huelga de transportistas impide el traslado habitual de mercancías y productos.',
+      operativo: 'Esta semana no llegan las reposiciones ni los traslados. Lo pendiente no se pierde: se suma a lo que llega la próxima semana.' },
+  ];
+  const EVENTO_PRIMERA_RONDA = 5;   // primera semana en la que se evalúa un evento
+  const EVENTO_PROB_INICIAL = 30;   // % de probabilidad de la primera evaluación
+  const EVENTO_PROB_PASO = 5;       // sube 5 puntos por cada evaluación sin evento
+  const EVENTO_ESPERA = 5;          // semanas desde que aparece un evento hasta la siguiente evaluación
+  const eventoPorId = (id) => EVENTOS.find((e) => e.id === id) || null;
+
+  // Decide (con el azar de la partida, igual en todos los celulares) si la semana n trae un evento.
+  // Se llama al cerrar la semana n-1. No depende de las decisiones de nadie.
+  function prepararEvento(estado, n) {
+    if (estado.semilla === null || estado.semilla === undefined) return;
+    if (estado.evento && n > estado.evento.fin) estado.evento = null;
+    if (estado.evento || n < estado.proxEval) return;
+    const rng = crearRng((estado.semilla ^ Math.imul(n, 0x85ebca6b) ^ 0x5bd1e995) >>> 0);
+    if (rng() < estado.probEvento / 100) {
+      const ev = EVENTOS[Math.min(EVENTOS.length - 1, Math.floor(rng() * EVENTOS.length))];
+      estado.evento = { id: ev.id, inicio: n, fin: n + ev.duracion - 1 };
+      estado.probEvento = EVENTO_PROB_INICIAL;
+      estado.proxEval = n + EVENTO_ESPERA;
+    } else {
+      estado.probEvento = Math.min(100, estado.probEvento + EVENTO_PROB_PASO);
+    }
+  }
+  // Evento que está activo en la semana t (o null)
+  function eventoActivo(estado, t) {
+    const e = estado.evento;
+    return e && t >= e.inicio && t <= e.fin ? e : null;
+  }
+
   function estadoInicial() {
     const equipo = () => {
       const stock = { fabrica: lotesVacios(), distribuidor: lotesVacios(), tienda: lotesVacios() };
@@ -123,7 +176,8 @@
     };
     const inf = {};
     INF_KEYS.forEach((k) => { inf[k] = { ocupadoHasta: 0, dueno: null, uplift: 0, hasta: -1 }; });
-    return { ronda: 0, inf, equipos: { A: equipo(), B: equipo() }, historial: [] };
+    return { ronda: 0, inf, equipos: { A: equipo(), B: equipo() }, historial: [],
+      semilla: null, evento: null, probEvento: EVENTO_PROB_INICIAL, proxEval: EVENTO_PRIMERA_RONDA };
   }
 
   // ---------- LECTURA DE DECISIONES (siempre limpia y acotada) ----------
@@ -232,6 +286,11 @@
     // Demanda del mercado y probabilidad de desvío (las mismas para ambos equipos)
     // Variación uniforme dentro de ±20% de la demanda media
     const base = PRODUCTOS.map((p) => Math.round(p.demMedia * (1 + CONFIG.ruidoDemanda * (2 * rng() - 1))));
+    const ev = eventoActivo(estado, t);
+    const evId = ev ? ev.id : null;
+    const evDef = ev ? eventoPorId(ev.id) : null;
+    const huelga = !!(evDef && evDef.logistico);
+    const modEv = PRODUCTOS.map((p, i) => 1 + ((evDef && evDef.efectos[i]) || 0));
     const prob = PRODUCTOS.map(() => CONFIG.probDesvioMin + (CONFIG.probDesvioMax - CONFIG.probDesvioMin) * rng());
 
     const lect = {
@@ -258,7 +317,7 @@
       const L = lect[X];
       for (const [clave, destino] of [['prod', 'fabrica'], ['fd', 'distribuidor'], ['dt', 'tienda']]) {
         eq.enTransito[clave] = eq.enTransito[clave].filter((e) => {
-          if (e.llega <= t) {
+          if (!huelga && e.llega <= t) {   // en huelga nada llega: queda pendiente para la próxima semana
             agregar(eq.stock[destino], e.p, e.q, e.c);
             return false;
           }
@@ -304,7 +363,7 @@
     const demanda = { A: zeros(), B: zeros() };
     PRODUCTOS.forEach((p, i) => {
       const suma = att.A[i] + att.B[i];
-      const mercado = base[i] * Math.pow(suma / 2, CONFIG.crecimientoMercado);
+      const mercado = base[i] * modEv[i] * Math.pow(suma / 2, CONFIG.crecimientoMercado);
       EQUIPOS.forEach((X) => { demanda[X][i] = Math.round(mercado * att[X][i] / suma); });
     });
 
@@ -388,6 +447,7 @@
     estado.ronda = t;
     estado.historial.push({
       ronda: t,
+      evento: evId,
       base,
       probDesvio: prob,
       subasta: Object.fromEntries(INF_KEYS.map((k) => [k, {
@@ -398,12 +458,14 @@
       }])),
       equipos: ctx,
     });
+    prepararEvento(estado, t + 1);
     return estado;
   }
 
   // Reconstruye todo el juego desde la semana 1 con las decisiones de cada semana.
   function reproducir(semilla, decisionesPorRonda) {
     const estado = estadoInicial();
+    estado.semilla = semilla >>> 0;
     decisionesPorRonda.forEach((dec, idx) => {
       const t = idx + 1;
       avanzarRonda(estado, t, dec, crearRng((semilla ^ Math.imul(t, 0x9e3779b1)) >>> 0));
@@ -516,6 +578,7 @@
 
   const API = {
     VERSION, CONFIG, PRODUCTOS, CALIDADES, INFLUENCERS, INF_KEYS, EQUIPOS, ROLES,
+    EVENTOS, eventoPorId, eventoActivo, prepararEvento,
     estadoInicial, avanzarRonda, reproducir, armarDecisiones, puntajes, sumaUtil,
     factorInfluencers, calidadPromedio, crearRng, leerDecision, decisionBot, BOT,
   };

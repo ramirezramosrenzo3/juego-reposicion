@@ -66,6 +66,9 @@
   let autoRonda = 0;    // semana en la que ya se envió automáticamente
   let semanaVista = 0;  // última semana que se pintó (para animar el cambio de semana)
   let semanaCadena = 0;
+  let popup = null;      // evento que se está presentando: { ronda, fin }
+  let popupVisto = 0;    // última semana cuyo aviso ya se mostró
+  let extRonda = 0;      // semana para la que ya se pidió el tiempo extra
   const camiones = new Map();
 
   // ---------- UTILIDADES ----------
@@ -175,6 +178,7 @@
       </section>`,
     juego: () => `
       <p id="aviso" class="aviso"></p>
+      <div id="evt"></div>
       <section class="card" id="dinero"></section>
       <section class="card">
         <h2><img class="ic-s" src="img/camion.png" alt="">Tu cadena</h2>
@@ -223,6 +227,8 @@
     guardar('sala', null);
     pantalla = '';
     semanaVista = 0;
+    popup = null; popupVisto = 0; extRonda = 0;
+    cerrarPopup();
     construir('inicio');
   }
 
@@ -599,6 +605,8 @@
     semanaVista = actual;
     const ult = estado.historial[estado.historial.length - 1];
     const rep = ult ? ult.equipos[yo.equipo] : null;
+    render($('evt'), htmlEvento());
+    gestionarEvento();
     render($('dinero'), htmlDinero(yo, ult));
     actualizarCadena(yo, ult, nueva);
     render($('mi'), htmlMi(yo, rep));
@@ -621,6 +629,75 @@
     t.classList.add('ver');
     clearTimeout(avisoSemana.h);
     avisoSemana.h = setTimeout(() => t.classList.remove('ver'), 2600);
+  }
+
+  // ---------- EVENTOS ALEATORIOS ----------
+  const pctTxt = (f) => (f > 0 ? '+' : '−') + Math.round(Math.abs(f) * 100) + '%';
+  const eventoAhora = () => {
+    const ev = estado && estado.evento;
+    return ev && actual >= ev.inicio && actual <= ev.fin ? JR.eventoPorId(ev.id) : null;
+  };
+  const efectosHtml = (def) => Object.keys(def.efectos).map(Number).sort((a, b) => a - b).map((i) => {
+    const f = def.efectos[i];
+    return `<div class="ev-ef ${f > 0 ? 'sube' : 'baja'}"><img src="img/galleta${i + 1}.png" alt=""><span>${esc(PRODUCTOS[i].nombre)}</span><b>${pctTxt(f)}</b></div>`;
+  }).join('');
+  const cuerpoEvento = (def) => (def.logistico
+    ? `<div class="ev-op">${esc(def.operativo)}</div>`
+    : `<div class="ev-efectos">${efectosHtml(def)}</div>`);
+
+  // Aviso fijo mientras dura el evento
+  function htmlEvento() {
+    const def = eventoAhora();
+    if (!def) return '';
+    const ev = estado.evento;
+    const quedan = ev.fin - actual + 1;
+    return `<section class="card ev-mini">
+      <img src="img/eventos/${def.id}.png" alt="">
+      <div><b>${esc(def.nombre)}</b> <small>· ${quedan === 1 ? 'última semana' : quedan + ' semanas'}</small>
+      ${def.logistico ? `<div class="ev-op">${esc(def.operativo)}</div>` : `<div class="ev-efectos">${efectosHtml(def)}</div>`}</div>
+    </section>`;
+  }
+
+  function htmlPopup(def) {
+    return `<div class="ev-card">
+      <div class="ev-barra"><i id="ev-prog"></i></div>
+      <img class="ev-icono" src="img/eventos/${def.id}.png" alt="">
+      <h2>${esc(def.nombre)}</h2>
+      <p class="ev-desc">${esc(def.desc)}</p>
+      ${cuerpoEvento(def)}
+      <div class="ev-pie"><span id="ev-seg"></span></div>
+    </div>`;
+  }
+
+  function cerrarPopup() {
+    popup = null;
+    const o = $('evento');
+    if (o) { o.hidden = true; o.innerHTML = ''; }
+    const app = $('app');
+    if (app) app.inert = false;
+    document.body.classList.remove('con-evento');
+  }
+
+  // Presenta el evento 10 s (sin botón de cerrar) y pide al servidor 10 s extra para que nadie pierda tiempo de decisión
+  function gestionarEvento() {
+    const def = eventoAhora();
+    const sem = vista && vista.semana;
+    if (!def || !estado.evento || estado.evento.inicio !== actual || !sem || !sem.inicio) return;
+    if (extRonda !== actual && !sem.extra) {
+      extRonda = actual;
+      sb.rpc('extender_ronda', { p_codigo: sala, p_jugador: jugadorId, p_ronda: actual }).then(() => {}, () => {});
+    }
+    if (popup || popupVisto === actual) return;
+    const fin = Date.parse(sem.inicio) + 10000;
+    if (isNaN(fin) || fin <= ahoraServidor()) { popupVisto = actual; return; }
+    popup = { ronda: actual, fin };
+    popupVisto = actual;
+    const o = $('evento');
+    o.innerHTML = htmlPopup(def);
+    o.hidden = false;
+    $('app').inert = true;
+    document.body.classList.add('con-evento');
+    if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
   }
 
   // 💰 Cuánto dinero tiene el equipo y de dónde sale
@@ -673,6 +750,7 @@
     if (r) r.textContent = `${EQ[R]}: ${rivalListos} de 3 ya decidieron esta semana.`;
 
     // Camiones: uno por cada envío (agrupados por semana de llegada)
+    const huelgaAhora = !!(eventoAhora() && eventoAhora().logistico);
     const vistos = new Set();
     [['prod', 'lane-prod'], ['fd', 'lane-fd'], ['dt', 'lane-dt']].forEach(([clave, laneId]) => {
       const lane = $(laneId);
@@ -706,7 +784,7 @@
           el.style.top = pos + '%';
         }
         el.querySelector('small').textContent =
-          `${num(g.q)} · ${g.r === 0 ? 'llega al cerrar esta semana' : 'llega al cerrar la próxima'}`;
+          `${num(g.q)} · ${g.r === 0 ? (huelgaAhora ? 'bloqueado por la huelga' : 'llega al cerrar esta semana') : 'llega al cerrar la próxima'}`;
       });
     });
     [...camiones.keys()].forEach((k) => {
@@ -961,7 +1039,7 @@
       etiqueta = 'Elige tu puesto';
     } else if (s && s.estado === 'jugando' && vista.semana && vista.semana.fin && vista.yo && vista.yo.rol) {
       fin = Date.parse(vista.semana.fin);
-      total = s.segundos;
+      total = s.segundos + (vista.semana.extra || 0);
       etiqueta = `Semana ${Math.min(vista.semana.ronda, s.total_rondas)} de ${s.total_rondas} · ${EQ[vista.yo.equipo]} · ${ROLN[vista.yo.rol]}`;
     }
     if (!fin || isNaN(fin)) { rl.hidden = true; document.body.classList.remove('con-reloj'); return; }
@@ -974,9 +1052,18 @@
     $('rl-prog').style.transform = `scaleX(${Math.max(0, Math.min(1, ms / (total * 1000)))})`;
     rl.classList.toggle('rojo', seg <= 10);
 
+    if (popup) {
+      const rest = popup.fin - ahoraServidor();
+      if (rest <= 0) cerrarPopup();
+      else {
+        const b = $('ev-prog'); if (b) b.style.transform = `scaleX(${Math.max(0, Math.min(1, rest / 10000))})`;
+        const t = $('ev-seg'); if (t) t.textContent = Math.ceil(rest / 1000) + ' s';
+      }
+    }
+
     // Si se acaba el tiempo y no enviaste nada, se envía automáticamente lo que tienes en pantalla
     if (s.estado === 'jugando' && ms <= 2000 && ms > -2500 && vista.miDec === null
-        && vista.semana.ronda === actual && autoRonda !== actual && pantalla === 'juego') {
+        && vista.semana.ronda === actual && autoRonda !== actual && pantalla === 'juego' && !popup) {
       autoRonda = actual;
       enviarDec(true).catch(() => {});   // un solo intento por semana
     }
