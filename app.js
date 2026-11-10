@@ -68,6 +68,7 @@
   let semanaVista = 0;  // última semana que se pintó (para animar el cambio de semana)
   let semanaCadena = 0;
   let popup = null;      // evento que se está presentando: { ronda, fin }
+  let habLocal = { ronda: 0, v: false };   // habilidad elegida en pantalla (se envía junto con la decisión)
   let popupVisto = 0;    // última semana cuyo aviso ya se mostró
   let extRonda = 0;      // semana para la que ya se pidió el tiempo extra
   const camiones = new Map();
@@ -374,19 +375,18 @@
     };
   }
 
-  async function enviarDec(auto, habilidad) {
+  async function enviarDec(auto) {
     const yo = datos && datos.yo;
     if (!yo || !yo.rol || !estado || !document.querySelector('#mi [data-accion="enviar-dec"]')) return false;
     const payload = leerFormulario(yo.rol);
     // La habilidad del rol viaja con la decisión solo si está confirmada (se conserva al actualizar)
-    const conHab = habilidad !== undefined ? habilidad : !!(datos.miDec && datos.miDec.habilidad === true);
-    if (conHab) payload.habilidad = true;
+    if (habActiva()) payload.habilidad = true;
     const { error } = await sb.rpc('enviar_decision', {
       p_codigo: sala, p_jugador: jugadorId, p_ronda: actual, p_payload: payload,
     });
     if (error) { aviso(mensajeError(error)); return false; }
     aviso(auto ? '⏱ Se acabó el tiempo: enviamos automáticamente lo que tenías en pantalla.'
-      : habilidad === true ? '✔ Habilidad programada y decisión enviada' : habilidad === false ? '✔ Habilidad cancelada' : '✔ Decisión enviada');
+      : payload.habilidad ? '✔ Decisión enviada con tu habilidad' : '✔ Decisión enviada');
     refrescar();
     return true;
   }
@@ -410,8 +410,8 @@
       else if (a === 'enviar-dec') await enviarDec(false);
       else if (a === 'hab-pedir') abrirConfirmaHab();
       else if (a === 'hab-volver') cerrarConfirmaHab();
-      else if (a === 'hab-ok') { cerrarConfirmaHab(); await enviarDec(false, true); }
-      else if (a === 'hab-cancelar') await enviarDec(false, false);
+      else if (a === 'hab-ok') { cerrarConfirmaHab(); elegirHab(true); }
+      else if (a === 'hab-cancelar') elegirHab(false);
       else if (a === 'salir-sala') await salirDeSala();
       else if (a === 'salir') salir();
     } catch (e) {
@@ -637,6 +637,7 @@
     render($('dinero'), htmlDinero(yo, ult));
     actualizarCadena(yo, ult, nueva);
     render($('mi'), htmlMi(yo, rep));
+    render($('hab'), htmlHab(yo));
     actualizarEstimado();
     render($('inf'), htmlInf());
     render($('ult'), htmlUlt(yo, ult));
@@ -661,28 +662,40 @@
 
   // ---------- HABILIDADES ESPECIALES ----------
   const stk = (id, cls) => `<img class="${cls || 'stk'}" src="img/habilidades/${id}.png" alt="">`;
-  const HAB_EFECTO = { incendio: '−30% inventario rival', fake: '−15% demanda rival · 2 semanas', gta: '−35% transporte rival' };
+  const HAB_EFECTO = {
+    incendio: '−30% inventario del rival',
+    fake: '−15% demanda del rival · 2 semanas',
+    gta: '−35% transporte del rival',
+  };
+
+  // ¿Está elegida la habilidad para esta semana? Lo elegido en pantalla manda; si no, lo ya enviado.
+  const habActiva = () => (habLocal.ronda === actual ? habLocal.v : !!(datos.miDec && datos.miDec.habilidad === true));
+  const habEnviada = () => !!(datos.miDec && datos.miDec.habilidad === true);
 
   function estadoHab(yo) {
     const hb = JR.habDeRol(yo.rol);
     const disp = JR.habilidadDisponible(estado, yo.equipo, hb.id, actual);
-    return { hb, disp, activa: !!(datos.miDec && datos.miDec.habilidad === true), ultima: actual >= datos.sala.total_rondas };
+    return { hb, disp, activa: habActiva(), ultima: actual >= datos.sala.total_rondas };
   }
 
-  // Tarjeta de la habilidad de tu rol (dentro de "Tu decisión")
+  // Tarjeta de la habilidad de tu rol (dentro de "Tu decisión"). Elegirla NO envía la decisión.
   function htmlHab(yo) {
     const { hb, disp, activa, ultima } = estadoHab(yo);
     const costo = JR.costoHab(hb);
     let accion;
-    if (activa) accion = '<button type="button" class="secundario" data-accion="hab-cancelar">Cancelar</button>';
-    else if (ultima) accion = '<button type="button" class="secundario" disabled>Última semana</button>';
-    else if (disp.ok) accion = `<button type="button" class="hab-usar" data-accion="hab-pedir">Usar · ${money(costo)}</button>`;
-    else if (disp.motivo === 'enfriamiento') accion = `<button type="button" class="secundario" disabled>En ${disp.faltan} sem</button>`;
-    else accion = `<button type="button" class="secundario" disabled>Faltan ${money(costo - JR.sumaUtil(estado.equipos[yo.equipo].utilidad))}</button>`;
+    if (activa) accion = '<button type="button" class="hab-btn quitar" data-accion="hab-cancelar">Quitar habilidad</button>';
+    else if (ultima) accion = '<button type="button" class="hab-btn" disabled>No disponible en la última semana</button>';
+    else if (disp.ok) accion = `<button type="button" class="hab-btn usar" data-accion="hab-pedir">Usar habilidad</button>`;
+    else if (disp.motivo === 'enfriamiento') accion = `<button type="button" class="hab-btn" disabled>Disponible en ${disp.faltan} sem</button>`;
+    else accion = `<button type="button" class="hab-btn" disabled>Faltan ${money(costo - JR.sumaUtil(estado.equipos[yo.equipo].utilidad))}</button>`;
+    // Elegida o quitada pero sin enviar todavía
+    const pendiente = activa !== habEnviada() ? '<div class="hab-pend">Se aplica al tocar «Enviar decisión»</div>' : '';
     return `<div class="hab ${activa ? 'activa' : ''}">
-      ${stk(hb.id)}
-      <div class="hab-t"><b>${esc(hb.nombre)}</b><small>${activa ? `Programada · ${money(costo)}` : HAB_EFECTO[hb.id]}</small></div>
-      ${accion}
+      <div class="hab-cab">
+        ${stk(hb.id)}
+        <div class="hab-t"><span class="hab-n">${esc(hb.nombre)}</span><b class="hab-e">${HAB_EFECTO[hb.id]}</b><small>Costo ${money(costo)}${activa ? ' · elegida' : ''}</small></div>
+      </div>
+      ${accion}${pendiente}
     </div>`;
   }
 
@@ -695,11 +708,11 @@
     o.innerHTML = `<div class="ev-card hab-card">
       ${stk(hb.id, 'ev-icono')}
       <h2>${esc(hb.nombre)}</h2>
-      <p class="ev-desc">${HAB_EFECTO[hb.id]}</p>
+      <p class="hab-e2">${HAB_EFECTO[hb.id]}</p>
       <div class="ev-op">Costo: ${money(JR.costoHab(hb))} del dinero del equipo</div>
       <div class="hab-bt">
         <button type="button" class="secundario" data-accion="hab-volver">Volver</button>
-        <button type="button" class="principal" data-accion="hab-ok">Confirmar</button>
+        <button type="button" class="principal" data-accion="hab-ok">Elegir</button>
       </div>
     </div>`;
     o.hidden = false;
@@ -707,6 +720,12 @@
   function cerrarConfirmaHab() {
     const o = $('hab-conf');
     if (o) { o.hidden = true; o.innerHTML = ''; }
+  }
+  // Solo cambia lo elegido en pantalla; la decisión sigue sin enviarse
+  function elegirHab(v) {
+    habLocal = { ronda: actual, v };
+    const yo = datos && datos.yo;
+    if (yo) render($('hab'), htmlHab(yo));
   }
 
   // Aviso rojo para los 3 integrantes del equipo que recibe el sabotaje (aparece aunque no haya pérdidas)
@@ -941,7 +960,7 @@
         <h3>Decide esta semana</h3>
         ${formulario}
         ${estim}
-        ${htmlHab(yo)}
+        <div id="hab"></div>
         ${boton}${estadoEnvio}`;
     }
 
@@ -974,7 +993,7 @@
         ${formulario}
         ${htmlSubasta(lim)}
         ${estim}
-        ${htmlHab(yo)}
+        <div id="hab"></div>
         ${boton}${estadoEnvio}`;
     }
 
@@ -1008,7 +1027,7 @@
       <h3>Precio y pedido</h3>
       ${formulario}
       ${estim}
-      ${htmlHab(yo)}
+      <div id="hab"></div>
       ${boton}${estadoEnvio}`;
   }
 

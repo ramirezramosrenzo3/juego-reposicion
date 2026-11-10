@@ -648,8 +648,10 @@ ok(J2.EVENTOS.length === 9, 'hay 9 eventos');
   // costo según dificultad
   {
     const costos = J.HABILIDADES.map((h) => `${h.id}=$${J.costoHab(h)}/${h.enfriamiento}sem`).join(' ');
-    ok(J.costoHab(HB('incendio')) === 200 && J.costoHab(HB('fake')) === 175 && J.costoHab(HB('gta')) === 300
+    ok(J.costoHab(HB('incendio')) === 70 && J.costoHab(HB('fake')) === 50 && J.costoHab(HB('gta')) === 110
       && HB('incendio').enfriamiento === 8 && HB('fake').enfriamiento === 6 && HB('gta').enfriamiento === 10 && HB('fake').duracion === 2, `costos y enfriamientos acordados (${costos})`);
+    J.setSabores(3); const c3 = J.costoHab(HB('gta')); J.setSabores(5);
+    ok(c3 < 110 && c3 > 0, `con 3 sabores el costo baja en proporción (GTA $${c3} en vez de $110)`);
   }
   // reproducción idéntica
   {
