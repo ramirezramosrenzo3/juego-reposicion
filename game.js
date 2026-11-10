@@ -69,12 +69,12 @@
   }
 
   // Versión del motor: se muestra en la sala para detectar celulares con reglas distintas
-  const VERSION = '4.3.1';
+  const VERSION = '5.1.1';
 
   // ---------- UTILIDADES ----------
   const zeros = () => Array(N).fill(0);
   const clamp = (x, a, b) => Math.min(b, Math.max(a, x));
-  const sumaUtil = (u) => u.ventas - u.mantenimiento - u.influencers;
+  const sumaUtil = (u) => u.ventas - u.mantenimiento - u.influencers - (u.habilidades || 0) - (u.perdidas || 0);
 
   function crearRng(semilla) {
     let a = semilla >>> 0;
@@ -139,6 +139,61 @@
   const EVENTO_PROB_INICIAL = 31;   // % de probabilidad de la primera evaluación
   const EVENTO_PROB_PASO = 5;       // sube 5 puntos por cada evaluación sin evento
   const EVENTO_ESPERA = 5;          // semanas desde que aparece un evento hasta la siguiente evaluación
+  // ---------- HABILIDADES ESPECIALES (una por rol, contra el equipo rival) ----------
+  // Se confirman en la semana t: el costo sale del dinero compartido del equipo al cerrar esa semana
+  // y el efecto se ejecuta al procesar la semana t+1. El cobro no depende de que haya algo que dañar.
+  const HABILIDADES = [
+    { id: 'incendio', rol: 'tienda',       nombre: 'Incendio',  pct: 0.30, costo: 200, enfriamiento: 8, aviso: 'INCENDIO: -30% INVENTARIO' },
+    { id: 'fake',     rol: 'distribuidor', nombre: 'Fake News', pct: 0.15, duracion: 2, costo: 175, enfriamiento: 6, aviso: 'FAKE NEWS: -15% DEMANDA' },
+    { id: 'gta',      rol: 'fabrica',      nombre: 'GTA',       pct: 0.35, costo: 300, enfriamiento: 10, aviso: 'GTA: -35% TRANSPORTE' },
+  ];
+  const habPorId = (id) => HABILIDADES.find((h) => h.id === id) || null;
+  // Costo en dinero del equipo (el mismo en cualquier dificultad)
+  const costoHab = (def) => def.costo;
+  const habDeRol = (rol) => HABILIDADES.find((h) => h.rol === rol) || null;
+  const rival = (X) => (X === 'A' ? 'B' : 'A');
+  // ¿Puede el equipo X usar la habilidad en la semana t? (solo mira su dinero y su enfriamiento,
+  // nunca lo que tiene el rival)
+  function habilidadDisponible(estado, X, id, t) {
+    const def = habPorId(id);
+    if (!def) return { ok: false, motivo: 'no existe' };
+    const ultimo = estado.hab[X][id] || 0;
+    const faltan = ultimo > 0 ? ultimo + def.enfriamiento - t : 0;
+    if (faltan > 0) return { ok: false, motivo: 'enfriamiento', faltan };
+    if (sumaUtil(estado.equipos[X].utilidad) < costoHab(def)) return { ok: false, motivo: 'fondos' };
+    return { ok: true };
+  }
+  // Ejecuta una habilidad programada contra el equipo V (se llama al inicio de la semana de ejecución)
+  function ejecutarHabilidad(estado, h, t) {
+    const def = habPorId(h.id);
+    const V = estado.equipos[h.contra];
+    const r = { id: h.id, de: h.de, contra: h.contra, perdido: 0 };
+    if (h.id === 'incendio') {
+      // La mercadería destruida se registra como pérdida a su costo (ya estaba pagada y nunca se vende)
+      PRODUCTOS.forEach((p, i) => {
+        const lote = retirar(V.stock.tienda, i, Math.round(V.stock.tienda[i].q * def.pct));
+        r.perdido += lote.q;
+        V.utilidad.perdidas += lote.q * lote.c;
+      });
+    } else if (h.id === 'fake') {
+      estado.fakeHasta[h.contra] = t + (def.duracion || 1) - 1;   // dura 'duracion' semanas contando la de ejecución
+    } else if (h.id === 'gta') {
+      const fd = V.enTransito.fd;
+      if (fd.length) {
+        const llega = Math.max(...fd.map((e) => e.llega));   // el último camión que despachó su fábrica
+        fd.filter((e) => e.llega === llega).forEach((e) => {
+          const n = Math.round(e.q * def.pct);
+          e.q -= n;
+          r.perdido += n;
+          V.utilidad.perdidas += n * e.c;   // lo que no llega se pierde a su costo
+        });
+        V.enTransito.fd = fd.filter((e) => e.q > 0);
+        r.llega = llega;
+        if (r.perdido > 0) V.sabotaje = { llega, perdido: r.perdido };
+      }
+    }
+    return r;
+  }
   const eventoPorId = (id) => EVENTOS.find((e) => e.id === id) || null;
 
   // Decide (con el azar de la partida, igual en todos los celulares) si la semana n trae un evento.
@@ -191,12 +246,14 @@
         enTransito,
         calidad: PRODUCTOS.map(() => 'estandar'),
         precio: PRODUCTOS.map(() => CONFIG.precioBase),
-        utilidad: { ventas: 0, mantenimiento: 0, influencers: 0 },
+        utilidad: { ventas: 0, mantenimiento: 0, influencers: 0, habilidades: 0, perdidas: 0 },
       };
     };
     const inf = {};
     INF_KEYS.forEach((k) => { inf[k] = { ocupadoHasta: 0, dueno: null, uplift: 0, hasta: -1 }; });
-    return { ronda: 0, inf, equipos: { A: equipo(), B: equipo() }, historial: [],
+    const hab = { A: {}, B: {} };
+    HABILIDADES.forEach((h) => { hab.A[h.id] = 0; hab.B[h.id] = 0; });
+    return { ronda: 0, inf, hab, pend: [], fakeHasta: { A: 0, B: 0 }, equipos: { A: equipo(), B: equipo() }, historial: [],
       semilla: null, evento: null, eventosUsados: [], probEvento: EVENTO_PROB_INICIAL, proxEval: EVENTO_PRIMERA_RONDA };
   }
 
@@ -236,6 +293,8 @@
         return Number.isFinite(v) ? clamp(Math.round(v * 100) / 100, CONFIG.precioMin, CONFIG.precioMax) : null;
       }),
       pedidoDist: cantidades(t.pedido),
+      // La habilidad del rol solo se usa si la decisión la trae confirmada (true exacto)
+      habilidad: { fabrica: f.habilidad === true, distribuidor: d.habilidad === true, tienda: t.habilidad === true },
     };
   }
 
@@ -320,6 +379,25 @@
     const antes = {};
     EQUIPOS.forEach((X) => { antes[X] = { ...estado.equipos[X].utilidad }; });
 
+    // 0) Habilidades confirmadas la semana anterior: se ejecutan ahora (antes de llegadas y ventas)
+    const hechas = [];
+    estado.pend = (estado.pend || []).filter((h) => {
+      if (h.ejecutar === t) { hechas.push(ejecutarHabilidad(estado, h, t)); return false; }
+      return h.ejecutar > t;
+    });
+    // 0b) Habilidades confirmadas esta semana: se cobran ahora y quedan programadas para la próxima.
+    //     No se mira si el rival tiene algo que dañar; solo el dinero y el enfriamiento del que ataca.
+    const usadas = { A: [], B: [] };
+    EQUIPOS.forEach((X) => {
+      HABILIDADES.forEach((hb) => {
+        if (!lect[X].habilidad[hb.rol] || !habilidadDisponible(estado, X, hb.id, t).ok) return;
+        estado.equipos[X].utilidad.habilidades += costoHab(hb);
+        estado.hab[X][hb.id] = t;
+        estado.pend.push({ id: hb.id, de: X, contra: rival(X), ejecutar: t + 1 });
+        usadas[X].push(hb.id);
+      });
+    });
+
     // 1) Calidad y precio de la semana (se quedan hasta que se cambien)
     EQUIPOS.forEach((X) => {
       const eq = estado.equipos[X];
@@ -384,7 +462,10 @@
     PRODUCTOS.forEach((p, i) => {
       const suma = att.A[i] + att.B[i];
       const mercado = base[i] * modEv[i] * Math.pow(suma / 2, CONFIG.crecimientoMercado);
-      EQUIPOS.forEach((X) => { demanda[X][i] = Math.round(mercado * att[X][i] / suma); });
+      EQUIPOS.forEach((X) => {
+        const fk = (estado.fakeHasta[X] || 0) >= t ? 1 - habPorId('fake').pct : 1;   // Fake News del rival
+        demanda[X][i] = Math.round(mercado * att[X][i] / suma * fk);
+      });
     });
 
     // 5) Ventas en tienda
@@ -460,14 +541,19 @@
         ventas: eq.utilidad.ventas - antes[X].ventas,
         mantenimiento: eq.utilidad.mantenimiento - antes[X].mantenimiento,
         influencers: eq.utilidad.influencers - antes[X].influencers,
+        habilidades: eq.utilidad.habilidades - antes[X].habilidades,
+        perdidas: eq.utilidad.perdidas - antes[X].perdidas,
       };
-      c.utilidadRonda.total = c.utilidadRonda.ventas - c.utilidadRonda.mantenimiento - c.utilidadRonda.influencers;
+      c.utilidadRonda.total = c.utilidadRonda.ventas - c.utilidadRonda.mantenimiento - c.utilidadRonda.influencers
+        - c.utilidadRonda.habilidades - c.utilidadRonda.perdidas;
+      c.habilidadesUsadas = usadas[X];
     });
 
     estado.ronda = t;
     estado.historial.push({
       ronda: t,
       evento: evId,
+      habilidades: hechas,
       base,
       probDesvio: prob,
       subasta: Object.fromEntries(INF_KEYS.map((k) => [k, {
@@ -597,6 +683,7 @@
   }
 
   const API = {
+    HABILIDADES, habPorId, habDeRol, habilidadDisponible, costoHab,
     VERSION, CONFIG, PRODUCTOS, PRODUCTOS_TODOS, DIFICULTADES, setSabores, CALIDADES, INFLUENCERS, INF_KEYS, EQUIPOS, ROLES,
     EVENTOS, eventoPorId, eventoActivo, prepararEvento,
     estadoInicial, avanzarRonda, reproducir, armarDecisiones, puntajes, sumaUtil,

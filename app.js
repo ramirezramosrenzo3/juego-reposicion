@@ -183,6 +183,7 @@
         <p id="aviso" class="aviso"></p>
       </section>`,
     juego: () => `
+      <div id="alerta"></div>
       <p id="aviso" class="aviso"></p>
       <div id="evt"></div>
       <section class="card" id="dinero"></section>
@@ -373,14 +374,19 @@
     };
   }
 
-  async function enviarDec(auto) {
+  async function enviarDec(auto, habilidad) {
     const yo = datos && datos.yo;
     if (!yo || !yo.rol || !estado || !document.querySelector('#mi [data-accion="enviar-dec"]')) return false;
+    const payload = leerFormulario(yo.rol);
+    // La habilidad del rol viaja con la decisión solo si está confirmada (se conserva al actualizar)
+    const conHab = habilidad !== undefined ? habilidad : !!(datos.miDec && datos.miDec.habilidad === true);
+    if (conHab) payload.habilidad = true;
     const { error } = await sb.rpc('enviar_decision', {
-      p_codigo: sala, p_jugador: jugadorId, p_ronda: actual, p_payload: leerFormulario(yo.rol),
+      p_codigo: sala, p_jugador: jugadorId, p_ronda: actual, p_payload: payload,
     });
     if (error) { aviso(mensajeError(error)); return false; }
-    aviso(auto ? '⏱ Se acabó el tiempo: enviamos automáticamente lo que tenías en pantalla.' : '✔ Decisión enviada');
+    aviso(auto ? '⏱ Se acabó el tiempo: enviamos automáticamente lo que tenías en pantalla.'
+      : habilidad === true ? '✔ Habilidad programada y decisión enviada' : habilidad === false ? '✔ Habilidad cancelada' : '✔ Decisión enviada');
     refrescar();
     return true;
   }
@@ -402,6 +408,10 @@
       else if (a === 'puesto') await elegirPuesto(b.dataset.eq, b.dataset.rol);
       else if (a === 'liberar') await liberarPuesto();
       else if (a === 'enviar-dec') await enviarDec(false);
+      else if (a === 'hab-pedir') abrirConfirmaHab();
+      else if (a === 'hab-volver') cerrarConfirmaHab();
+      else if (a === 'hab-ok') { cerrarConfirmaHab(); await enviarDec(false, true); }
+      else if (a === 'hab-cancelar') await enviarDec(false, false);
       else if (a === 'salir-sala') await salirDeSala();
       else if (a === 'salir') salir();
     } catch (e) {
@@ -560,8 +570,9 @@
           <li>Cada equipo tiene fábrica → distribuidor → tienda. Cada rol decide su área.</li>
           <li>Los bots 🤖 ocupan los lugares vacíos y deciden solos cada semana; no hacen falta 6 personas.</li>
           <li>Fábrica: calidad y producción. Distribuidor: pedidos a fábrica y pujas por influencers. Tienda: precio y pedidos al distribuidor.</li>
+          <li>Habilidades contra el rival (una por rol; cuestan dinero del equipo y tienen enfriamiento): ${JR.HABILIDADES.map((h) => `${stk(h.id, 'stk-xs')}${esc(h.nombre)} (${money(JR.costoHab(h))})`).join(' · ')}. Se ejecutan la semana siguiente.</li>
           <li>Hay ${s.sabores || 5} sabores. La demanda es del mercado y la comparten los dos equipos; cambia cada semana.</li>
-          <li>Ganancia del equipo = ventas − costo de lo vendido − mantenimiento del stock − pujas pagadas.</li>
+          <li>Ganancia del equipo = ventas − costo de lo vendido − mantenimiento del stock − pujas pagadas − habilidades usadas − mercadería perdida por sabotajes.</li>
           <li>Si no envías tu decisión antes de que acabe el tiempo, se envía sola lo que tengas en pantalla.</li>
           <li>Influencers (opcionales): suben la demanda de todos los sabores de su equipo. Las pujas son secretas: gana el monto más alto y paga ese monto. Si hay empate, gana el equipo con mejor calidad.</li>
         </ul>
@@ -619,8 +630,10 @@
     semanaVista = actual;
     const ult = estado.historial[estado.historial.length - 1];
     const rep = ult ? ult.equipos[yo.equipo] : null;
+    render($('alerta'), htmlAlertas(yo));
     render($('evt'), htmlEvento());
     gestionarEvento();
+    if (nueva) cerrarConfirmaHab();
     render($('dinero'), htmlDinero(yo, ult));
     actualizarCadena(yo, ult, nueva);
     render($('mi'), htmlMi(yo, rep));
@@ -643,6 +656,66 @@
     t.classList.add('ver');
     clearTimeout(avisoSemana.h);
     avisoSemana.h = setTimeout(() => t.classList.remove('ver'), 2600);
+  }
+
+
+  // ---------- HABILIDADES ESPECIALES ----------
+  const stk = (id, cls) => `<img class="${cls || 'stk'}" src="img/habilidades/${id}.png" alt="">`;
+  const HAB_EFECTO = { incendio: '−30% inventario rival', fake: '−15% demanda rival · 2 semanas', gta: '−35% transporte rival' };
+
+  function estadoHab(yo) {
+    const hb = JR.habDeRol(yo.rol);
+    const disp = JR.habilidadDisponible(estado, yo.equipo, hb.id, actual);
+    return { hb, disp, activa: !!(datos.miDec && datos.miDec.habilidad === true), ultima: actual >= datos.sala.total_rondas };
+  }
+
+  // Tarjeta de la habilidad de tu rol (dentro de "Tu decisión")
+  function htmlHab(yo) {
+    const { hb, disp, activa, ultima } = estadoHab(yo);
+    const costo = JR.costoHab(hb);
+    let accion;
+    if (activa) accion = '<button type="button" class="secundario" data-accion="hab-cancelar">Cancelar</button>';
+    else if (ultima) accion = '<button type="button" class="secundario" disabled>Última semana</button>';
+    else if (disp.ok) accion = `<button type="button" class="hab-usar" data-accion="hab-pedir">Usar · ${money(costo)}</button>`;
+    else if (disp.motivo === 'enfriamiento') accion = `<button type="button" class="secundario" disabled>En ${disp.faltan} sem</button>`;
+    else accion = `<button type="button" class="secundario" disabled>Faltan ${money(costo - JR.sumaUtil(estado.equipos[yo.equipo].utilidad))}</button>`;
+    return `<div class="hab ${activa ? 'activa' : ''}">
+      ${stk(hb.id)}
+      <div class="hab-t"><b>${esc(hb.nombre)}</b><small>${activa ? `Programada · ${money(costo)}` : HAB_EFECTO[hb.id]}</small></div>
+      ${accion}
+    </div>`;
+  }
+
+  function abrirConfirmaHab() {
+    const yo = datos && datos.yo;
+    if (!yo || !yo.rol || !estado) return;
+    const { hb, disp, activa, ultima } = estadoHab(yo);
+    if (!disp.ok || activa || ultima) return;
+    const o = $('hab-conf');
+    o.innerHTML = `<div class="ev-card hab-card">
+      ${stk(hb.id, 'ev-icono')}
+      <h2>${esc(hb.nombre)}</h2>
+      <p class="ev-desc">${HAB_EFECTO[hb.id]}</p>
+      <div class="ev-op">Costo: ${money(JR.costoHab(hb))} del dinero del equipo</div>
+      <div class="hab-bt">
+        <button type="button" class="secundario" data-accion="hab-volver">Volver</button>
+        <button type="button" class="principal" data-accion="hab-ok">Confirmar</button>
+      </div>
+    </div>`;
+    o.hidden = false;
+  }
+  function cerrarConfirmaHab() {
+    const o = $('hab-conf');
+    if (o) { o.hidden = true; o.innerHTML = ''; }
+  }
+
+  // Aviso rojo para los 3 integrantes del equipo que recibe el sabotaje (aparece aunque no haya pérdidas)
+  function htmlAlertas(yo) {
+    const X = yo.equipo;
+    const ids = [];
+    (estado.pend || []).forEach((h) => { if (h.contra === X && h.ejecutar === actual && !ids.includes(h.id)) ids.push(h.id); });
+    if (((estado.fakeHasta || {})[X] || 0) >= actual && !ids.includes('fake')) ids.push('fake');   // segunda semana de Fake News
+    return ids.map((id) => `<div class="alerta">${stk(id, 'stk-a')}<b>${esc(JR.habPorId(id).aviso)}</b></div>`).join('');
   }
 
   // ---------- EVENTOS ALEATORIOS ----------
@@ -728,6 +801,8 @@
       <div class="cajas">
         <div class="caja"><small>Ventas última semana</small><b>${semana ? money(semana.ventas) : '—'}</b></div>
         <div class="caja"><small>Mantenimiento</small><b>${semana ? money(semana.mantenimiento) : '—'}</b></div>
+        ${semana && semana.habilidades > 0 ? `<div class="caja"><small>${(ult.equipos[X].habilidadesUsadas || []).map((id) => stk(id, 'stk-xs')).join('')}Habilidad</small><b>${money(semana.habilidades)}</b></div>` : ''}
+        ${semana && semana.perdidas > 0 ? `<div class="caja"><small>${(ult.habilidades || []).filter((h) => h.contra === X && h.id !== 'fake').map((h) => stk(h.id, 'stk-xs')).join('')}Sabotaje</small><b class="neg">${money(semana.perdidas)}</b></div>` : ''}
       </div>
       <p class="rival">${dif === 0 ? `Empatan con ${esc(EQ[R])}` : dif > 0
         ? `<span class="pos">Vas ganando por ${money(dif)}</span> a ${esc(EQ[R])}`
@@ -773,7 +848,7 @@
       eq.enTransito[clave].forEach((e) => {
         if (e.q <= 0) return;
         const k = `${clave}|${e.llega}`;
-        grupos[k] = grupos[k] || { q: 0, r: remDe(e) };
+        grupos[k] = grupos[k] || { q: 0, r: remDe(e), gta: clave === 'fd' && !!eq.sabotaje && eq.sabotaje.llega === e.llega };
         grupos[k].q += e.q;
       });
       Object.keys(grupos).forEach((k) => {
@@ -797,8 +872,10 @@
         } else {
           el.style.top = pos + '%';
         }
-        el.querySelector('small').textContent =
-          `${num(g.q)} · ${g.r === 0 ? (huelgaAhora ? 'bloqueado por la huelga' : 'llega al cerrar esta semana') : 'llega al cerrar la próxima'}`;
+        el.classList.toggle('humo', g.gta);   // camión sabotaje: humo
+        el.querySelector('small').innerHTML = esc(
+          `${num(g.q)} · ${g.r === 0 ? (huelgaAhora ? 'bloqueado por la huelga' : 'llega al cerrar esta semana') : 'llega al cerrar la próxima'}`)
+          + (g.gta ? ` ${stk('gta', 'stk-xs')} −35%` : '');
       });
     });
     [...camiones.keys()].forEach((k) => {
@@ -864,6 +941,7 @@
         <h3>Decide esta semana</h3>
         ${formulario}
         ${estim}
+        ${htmlHab(yo)}
         ${boton}${estadoEnvio}`;
     }
 
@@ -896,6 +974,7 @@
         ${formulario}
         ${htmlSubasta(lim)}
         ${estim}
+        ${htmlHab(yo)}
         ${boton}${estadoEnvio}`;
     }
 
@@ -929,6 +1008,7 @@
       <h3>Precio y pedido</h3>
       ${formulario}
       ${estim}
+      ${htmlHab(yo)}
       ${boton}${estadoEnvio}`;
   }
 

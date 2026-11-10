@@ -154,7 +154,7 @@ Cada persona ve solo la pantalla de su rol:
 - **Distribuidor:** elige cuánto pedir a la fábrica (llega en 2 semanas) y, si quiere, **puja por los influencers** (ver abajo).
 - **Tienda final:** elige el precio de cada sabor (entre $2.50 y $8.00) y cuánto pedir al distribuidor (llega en 2 semanas).
 
-Todos los celulares deben mostrar la misma **versión del juego** (aparece en la sala de espera y al final de la partida, por ejemplo `4.3.1`). Si alguien ve otra, que recargue la página.
+Todos los celulares deben mostrar la misma **versión del juego** (aparece en la sala de espera y al final de la partida, por ejemplo `5.1.1`). Si alguien ve otra, que recargue la página.
 
 Cada semana:
 1. Escribe tu decisión y toca **Enviar decisión**. Puedes cambiarla mientras el tiempo corra, con **Actualizar decisión**.
@@ -174,11 +174,11 @@ Un bot es un jugador que maneja el juego. Ocupa un lugar de fábrica, distribuid
 - **Qué tan buenos son:** son un rival razonable, no un experto. En simulaciones atienden casi toda la demanda, quedan parejos entre ellos y le ganan siempre a un equipo que no hace nada. Los detalles están en `REGLAS.md`, sección 16.
 - **Importante:** las decisiones de los bots las envía el celular de las personas. Si todas las personas cierran la página, la partida se detiene hasta que alguien vuelva a abrirla.
 
-## Actualizar a la versión 4.3.1 (eventos aleatorios, textos cortos, 15 s)
+## Actualizar a la versión 5.1.1 (eventos aleatorios, textos cortos, 15 s)
 
 1. **Primero la base de datos:** en Supabase > SQL Editor pega TODO el `supabase.sql` nuevo y toca **Run** (crea la tabla `extras` y las funciones del tiempo extra; no borra partidas).
 2. **Después los archivos:** en GitHub sube `index.html`, `game.js`, `app.js` y la carpeta **`img/eventos`** (9 imágenes). Nunca `config.js`.
-3. La sala de espera debe decir **Versión del juego: 4.3.1**.
+3. La sala de espera debe decir **Versión del juego: 5.1.1**.
 
 ### Eventos aleatorios
 Desde la **semana 5** puede aparecer un evento (31 % de probabilidad; sube 5 puntos cada semana que no sale, hasta 100 %). Al aparecer, vuelve a 31 % y espera 5 semanas. Nunca hay dos a la vez y un evento no se repite en la misma partida. Todos los celulares ven el mismo evento a la vez, con una presentación obligatoria de 15 segundos (sin botón para cerrarla); el servidor agrega 15 segundos a esa semana para que nadie pierda tiempo de decisión.
@@ -269,8 +269,8 @@ Para cambiar un número: en GitHub abre `game.js`, toca el ícono del lápiz, ca
 | "La sala no existe" | Revisa que el código esté bien escrito. Las letras no distinguen mayúsculas. |
 | "La partida ya empezó" | Solo puedes unirte antes de que el anfitrión toque **Iniciar partida**. |
 | "La sala ya tiene 6 jugadores" | Ya están completos y no hay bots que ceder. Crea otra sala. |
-| "Falta actualizar la base de datos…" o "Could not find the function … completar_bots" | Pega de nuevo el `supabase.sql` de la versión 4.3.1 en Supabase y toca **Run** (ver **Actualizar a la versión 3.1**). |
-| Los bots no deciden y la semana espera todo el tiempo | Revisa que al menos una persona tenga la página abierta y que todos tengan la misma versión (4.3.1). |
+| "Falta actualizar la base de datos…" o "Could not find the function … completar_bots" | Pega de nuevo el `supabase.sql` de la versión 5.1.1 en Supabase y toca **Run** (ver **Actualizar a la versión 3.1**). |
+| Los bots no deciden y la semana espera todo el tiempo | Revisa que al menos una persona tenga la página abierta y que todos tengan la misma versión (5.1.1). |
 | "Se acabó el tiempo de esta semana" | La semana ya se cerró. Espera a la siguiente. |
 | Error en rojo en el SQL de Supabase | Copia el mensaje completo y envíamelo. |
 | El proyecto de Supabase no responde | Los proyectos gratis se pausan tras una semana sin uso. Entra a Supabase y reactívalo. |

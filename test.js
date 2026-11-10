@@ -540,6 +540,125 @@ ok(J2.EVENTOS.length === 9, 'hay 9 eventos');
   ok(eh.evento === null || eh.evento.id !== 'huelga' || eh.evento.fin >= 2, 'la huelga termina tras 1 semana');
 }
 
+
+// ---------- HABILIDADES ESPECIALES ----------
+{
+  J.setSabores(5);
+  const rng = (n) => J.crearRng(n);
+  const nuevo = (sd) => { const e = J.estadoInicial(); e.semilla = sd; e.equipos.A.utilidad.ventas = 1000; e.equipos.B.utilidad.ventas = 1000; return e; };
+  const sinEv = (e) => { e.proxEval = 999; return e; };      // sin eventos aleatorios que ensucien la comparación
+  const dosSemanas = (e, d1, d2) => { J.avanzarRonda(e, 1, d1, rng(11)); J.avanzarRonda(e, 2, d2 || { A: {}, B: {} }, rng(12)); return e; };
+  const HB = (id) => J.habPorId(id);
+
+  // catálogo
+  ok(J.HABILIDADES.length === 3 && J.habDeRol('tienda').id === 'incendio' && J.habDeRol('distribuidor').id === 'fake' && J.habDeRol('fabrica').id === 'gta', 'cada rol tiene su habilidad: tienda=incendio, distribuidor=fake news, fábrica=GTA');
+  ok(HB('incendio').pct === 0.30 && HB('fake').pct === 0.15 && HB('gta').pct === 0.35, 'porcentajes: 30 %, 15 % y 35 %');
+  J.setSabores(5);
+
+  // INCENDIO: programado, no inmediato, 30 % igual en todos los sabores, cobro
+  {
+    const base = sinEv(nuevo(21)), ata = sinEv(nuevo(21));
+    J.avanzarRonda(base, 1, { A: {}, B: {} }, rng(11));
+    J.avanzarRonda(ata, 1, { A: { tienda: { habilidad: true } }, B: {} }, rng(11));
+    ok(JSON.stringify(ata.equipos.B.stock) === JSON.stringify(base.equipos.B.stock), 'incendio: no pasa nada de inmediato a la tienda rival');
+    ok(ata.equipos.A.utilidad.habilidades === J.costoHab(HB('incendio')), 'incendio: el costo se cobra al equipo que lo usa');
+    ok(ata.equipos.B.utilidad.habilidades === 0, 'incendio: el rival no paga nada');
+    ok(ata.pend.length === 1 && ata.pend[0].ejecutar === 2 && ata.pend[0].contra === 'B', 'incendio: queda programado para la semana siguiente contra el rival');
+    const q = ata.equipos.B.stock.tienda.map((l) => l.q);
+    const esperado = q.reduce((s, x) => s + Math.round(x * 0.3), 0);
+    const propios = JSON.stringify(ata.equipos.A.stock.tienda);
+    J.avanzarRonda(ata, 2, { A: {}, B: {} }, rng(12));
+    const h = ata.historial[1].habilidades[0];
+    ok(h && h.id === 'incendio' && h.perdido === esperado && esperado > 0, `incendio: destruye el 30 % de la tienda rival (${h && h.perdido} galletas)`);
+    ok(ata.pend.length === 0, 'incendio: la acción pendiente se consume (sin duplicarse)');
+    ok(ata.equipos.B.utilidad.perdidas > 0, 'incendio: la mercadería destruida se registra como pérdida del rival');
+    ok(ata.equipos.A.stock.tienda.every((l, i) => l.q >= 0) && ata.historial[1].habilidades.length === 1, 'incendio: nunca daña al propio equipo');
+  }
+  // incendio sin inventario: igual se cobra y se ejecuta
+  {
+    const e = sinEv(nuevo(22));
+    J.avanzarRonda(e, 1, { A: { tienda: { habilidad: true } }, B: {} }, rng(11));
+    e.equipos.B.stock.tienda.forEach((l) => { l.q = 0; });
+    const cobrado = e.equipos.A.utilidad.habilidades;
+    J.avanzarRonda(e, 2, { A: {}, B: {} }, rng(12));
+    ok(cobrado > 0 && e.historial[1].habilidades[0].id === 'incendio' && e.historial[1].habilidades[0].perdido === 0, 'incendio sin inventario: se cobra y se ejecuta sin destruir nada');
+  }
+  // FAKE NEWS: -15 % de demanda del rival solo la semana siguiente
+  {
+    const base = sinEv(nuevo(23)), ata = sinEv(nuevo(23));
+    J.avanzarRonda(base, 1, { A: {}, B: {} }, rng(11)); J.avanzarRonda(base, 2, { A: {}, B: {} }, rng(12));
+    J.avanzarRonda(ata, 1, { A: { distribuidor: { habilidad: true } }, B: {} }, rng(11)); J.avanzarRonda(ata, 2, { A: {}, B: {} }, rng(12));
+    const dB1 = (e) => e.historial[0].equipos.B.demanda, dB2 = (e) => e.historial[1].equipos.B.demanda;
+    ok(JSON.stringify(dB1(base)) === JSON.stringify(dB1(ata)), 'fake news: no cambia la demanda de la semana en que se confirma');
+    ok(dB2(base).every((x, i) => Math.abs(dB2(ata)[i] - x * 0.85) <= 1), 'fake news: la semana siguiente baja 15 % la demanda de TODOS los sabores del rival');
+    ok(JSON.stringify(base.historial[1].equipos.A.demanda) === JSON.stringify(ata.historial[1].equipos.A.demanda), 'fake news: no afecta la demanda del propio equipo');
+    J.avanzarRonda(base, 3, { A: {}, B: {} }, rng(13)); J.avanzarRonda(ata, 3, { A: {}, B: {} }, rng(13));
+    ok(base.historial[2].equipos.B.demanda.every((x, i) => Math.abs(ata.historial[2].equipos.B.demanda[i] - x * 0.85) <= 1), 'fake news: dura 2 semanas (también baja 15 % la segunda)');
+    J.avanzarRonda(base, 4, { A: {}, B: {} }, rng(14)); J.avanzarRonda(ata, 4, { A: {}, B: {} }, rng(14));
+    ok(JSON.stringify(base.historial[3].equipos.B.demanda) === JSON.stringify(ata.historial[3].equipos.B.demanda), 'fake news: la tercera semana la demanda vuelve a la normalidad');
+  }
+  // GTA: último camión de la fábrica rival -35 %
+  {
+    const e = sinEv(nuevo(24));
+    J.avanzarRonda(e, 1, { A: { fabrica: { habilidad: true } }, B: {} }, rng(11));
+    const ult = Math.max(...e.equipos.B.enTransito.fd.map((x) => x.llega));
+    const camion = e.equipos.B.enTransito.fd.filter((x) => x.llega === ult);
+    const antes = camion.reduce((s, x) => s + x.q, 0);
+    const esperado = camion.reduce((s, x) => s + Math.round(x.q * 0.35), 0);
+    const otros = e.equipos.B.enTransito.fd.filter((x) => x.llega !== ult).reduce((s, x) => s + x.q, 0);
+    J.avanzarRonda(e, 2, { A: {}, B: {} }, rng(12));
+    const h = e.historial[1].habilidades[0];
+    ok(h.id === 'gta' && h.perdido === esperado && esperado > 0 && h.llega === ult, `GTA: el último camión pierde 35 % (${esperado} de ${antes})`);
+    const base = sinEv(nuevo(24));
+    J.avanzarRonda(base, 1, { A: {}, B: {} }, rng(11)); J.avanzarRonda(base, 2, { A: {}, B: {} }, rng(12));
+    const stockDist = (x) => x.equipos.B.stock.distribuidor.reduce((s, l) => s + l.q, 0);
+    ok(stockDist(base) - stockDist(e) === esperado, 'GTA: el distribuidor recibe solo lo que no se perdió (cantidades enviadas y recibidas coherentes)');
+    ok(e.equipos.B.sabotaje && e.equipos.B.sabotaje.perdido === esperado, 'GTA: queda registrado para mostrarlo en pantalla');
+  }
+  // GTA sin camión: igual se cobra
+  {
+    const e = sinEv(nuevo(25));
+    J.avanzarRonda(e, 1, { A: { fabrica: { habilidad: true } }, B: {} }, rng(11));
+    e.equipos.B.enTransito.fd = [];
+    J.avanzarRonda(e, 2, { A: {}, B: {} }, rng(12));
+    ok(e.equipos.A.utilidad.habilidades === J.costoHab(HB('gta')) && e.historial[1].habilidades[0].perdido === 0, 'GTA sin camión: se cobra y no pierde nada');
+  }
+  // fondos y enfriamiento
+  {
+    const e = sinEv(J.estadoInicial()); e.semilla = 26;
+    J.avanzarRonda(e, 1, { A: { tienda: { habilidad: true } }, B: {} }, rng(11));
+    ok(e.equipos.A.utilidad.habilidades === 0 && e.pend.length === 0, 'sin dinero suficiente no se puede usar (y no se cobra)');
+    const f = sinEv(nuevo(27));
+    const dec = (x) => ({ A: { tienda: { habilidad: x } }, B: {} });
+    J.avanzarRonda(f, 1, dec(true), rng(11));
+    J.avanzarRonda(f, 2, dec(true), rng(12));
+    ok(f.equipos.A.utilidad.habilidades === J.costoHab(HB('incendio')), 'enfriamiento: no se puede repetir la semana siguiente');
+    for (let t = 3; t <= 8; t++) J.avanzarRonda(f, t, dec(t === 5 ? true : false), rng(10 + t));
+    ok(f.equipos.A.utilidad.habilidades === J.costoHab(HB('incendio')), 'enfriamiento: sigue bloqueado antes de cumplir el periodo');
+    J.avanzarRonda(f, 9, dec(true), rng(19));
+    ok(f.equipos.A.utilidad.habilidades === 2 * J.costoHab(HB('incendio')), 'enfriamiento: se puede volver a usar al cumplirse (semana 1 + 8)');
+    ok(J.habilidadDisponible(f, 'A', 'incendio', 10).motivo === 'enfriamiento' && J.habilidadDisponible(f, 'B', 'incendio', 10).ok, 'cada equipo tiene su propio enfriamiento');
+  }
+  // ninguna habilidad la puede usar otro rol
+  {
+    const e = sinEv(nuevo(28));
+    J.avanzarRonda(e, 1, { A: { fabrica: { habilidad: false }, distribuidor: { habilidad: 'si' }, tienda: { habilidad: 1 } }, B: {} }, rng(11));
+    ok(e.pend.length === 0 && e.equipos.A.utilidad.habilidades === 0, 'solo cuenta la confirmación exacta (true) del rol dueño de la habilidad');
+  }
+  // costo según dificultad
+  {
+    const costos = J.HABILIDADES.map((h) => `${h.id}=$${J.costoHab(h)}/${h.enfriamiento}sem`).join(' ');
+    ok(J.costoHab(HB('incendio')) === 200 && J.costoHab(HB('fake')) === 175 && J.costoHab(HB('gta')) === 300
+      && HB('incendio').enfriamiento === 8 && HB('fake').enfriamiento === 6 && HB('gta').enfriamiento === 10 && HB('fake').duracion === 2, `costos y enfriamientos acordados (${costos})`);
+  }
+  // reproducción idéntica
+  {
+    const decs = [{ A: { tienda: { habilidad: true } }, B: {} }, { A: {}, B: {} }, { A: {}, B: {} }];
+    const a = J.reproducir(31, decs), b = J.reproducir(31, decs);
+    ok(JSON.stringify(a.historial) === JSON.stringify(b.historial), 'las habilidades se reproducen igual en todos los celulares');
+  }
+}
+
 console.log(`\n${pruebas - fallos} de ${pruebas} pruebas pasaron.`);
 if (fallos > 0) { console.log(`${fallos} FALLARON.`); process.exitCode = 1; }
 else console.log('Todo bien.');

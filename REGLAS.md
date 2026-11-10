@@ -1,4 +1,4 @@
-# Reglas del juego de reposición (versión 4.3.1)
+# Reglas del juego de reposición (versión 5.1.1)
 
 Esta es la referencia del juego. Los números exactos están en `game.js` (bloque `CONFIG`, `PRODUCTOS`, `CALIDADES`, `INFLUENCERS`). Si este documento y el código no coinciden, avísame para corregir uno de los dos.
 
@@ -175,3 +175,11 @@ Desde la semana 5 se evalúa si aparece un evento: 31 % la primera vez; cada eva
 
 ## 18. Dificultad
 Al crear la sala se elige 3, 4 o 5 sabores (de arriba hacia abajo: chocolate, vainilla, menta, fresa, mora). Todas las reglas son iguales; solo cambia la cantidad de sabores en producción, pedidos, demanda y ventas.
+
+## 19. Habilidades especiales
+Cada rol tiene una habilidad exclusiva contra el equipo rival (nunca contra el propio):
+- ![](img/habilidades/incendio.png) **Incendio** (Tienda): destruye 30 % del inventario del almacén de la tienda rival, igual en todos los sabores. Cuesta $200; enfriamiento 8 semanas.
+- ![](img/habilidades/fake.png) **Fake News** (Distribuidor): −15 % de demanda en todos los sabores del rival durante 2 semanas. Cuesta $175; enfriamiento 6 semanas.
+- ![](img/habilidades/gta.png) **GTA** (Fábrica): el último camión despachado por la fábrica rival pierde 35 % de su carga. Cuesta $300; enfriamiento 10 semanas.
+
+Reglas: se confirman durante la semana t; el costo sale del dinero compartido del equipo al cerrar la semana t (siempre, aunque no haya nada que dañar; solo si alcanza el dinero y no hay enfriamiento); el efecto se ejecuta al procesar la semana t+1, antes de llegadas y ventas. Los 3 integrantes del equipo afectado ven un aviso rojo al comenzar la semana de ejecución. La mercadería destruida o perdida se registra como pérdida a su costo. El enfriamiento cuenta desde la semana en que se usó. No se puede usar en la última semana.
