@@ -284,6 +284,14 @@
       th { font-size: 0.72rem; white-space: normal; }
     }
 
+    /* ---- Dificultad ---- */
+    .dif { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 8px; }
+    .dif-op { margin: 0; width: auto; padding: 10px 4px; display: flex; flex-direction: column; gap: 2px; align-items: center;
+      background: #F7EBDA; border: 2px solid transparent; border-radius: 12px; color: inherit; font: inherit; cursor: pointer; }
+    .dif-op b { font-size: .95rem; }
+    .dif-op small { font-size: .72rem; opacity: .85; text-align: center; }
+    .dif-op.sel { border-color: var(--azul); background: var(--amarillo, #F5DDBE); }
+
     /* ---- Eventos aleatorios ---- */
     .evento { position: fixed; inset: 0; z-index: 200; display: flex; align-items: center; justify-content: center;
       background: rgba(60, 38, 22, 0.78); padding: 16px; animation: ev-in .35s ease; }

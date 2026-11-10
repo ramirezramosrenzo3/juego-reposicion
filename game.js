@@ -29,12 +29,20 @@
     stockInicial: { fabrica: 1.5, distribuidor: 1, tienda: 0.5 },
   };
 
-  const PRODUCTOS = [
+  const PRODUCTOS_TODOS = [
     { id: 'chocolate', nombre: 'Chocolate', color: '#8B5E3C', capProd: 250, demMedia: 90 },
     { id: 'vainilla',  nombre: 'Vainilla',  color: '#F7E8D0', capProd: 220, demMedia: 80 },
     { id: 'menta',     nombre: 'Menta',     color: '#A8E6C1', capProd: 200, demMedia: 70 },
     { id: 'fresa',     nombre: 'Fresa',     color: '#F7A4C6', capProd: 180, demMedia: 60 },
     { id: 'mora',      nombre: 'Mora',      color: '#8E4B77', capProd: 160, demMedia: 50 },
+  ];
+  // Dificultad: cuántos sabores se juegan (3, 4 o 5), siempre los primeros de arriba hacia abajo.
+  // PRODUCTOS es la lista activa; setSabores la ajusta (se llama con el dato de la sala antes de calcular).
+  const PRODUCTOS = PRODUCTOS_TODOS.slice();
+  const DIFICULTADES = [
+    { sabores: 3, nombre: 'Paseo en el parque' },
+    { sabores: 4, nombre: 'Emprendimiento' },
+    { sabores: 5, nombre: 'Caos de oficina' },
   ];
 
   const CALIDADES = {
@@ -52,10 +60,16 @@
 
   const EQUIPOS = ['A', 'B'];
   const ROLES = ['fabrica', 'distribuidor', 'tienda'];
-  const N = PRODUCTOS.length;
+  let N = PRODUCTOS.length;
+  function setSabores(n) {
+    n = Math.max(3, Math.min(PRODUCTOS_TODOS.length, Math.floor(Number(n)) || PRODUCTOS_TODOS.length));
+    PRODUCTOS.length = 0;
+    PRODUCTOS_TODOS.slice(0, n).forEach((p) => PRODUCTOS.push(p));
+    N = n;
+  }
 
   // Versión del motor: se muestra en la sala para detectar celulares con reglas distintas
-  const VERSION = '4.2.3';
+  const VERSION = '4.3.1';
 
   // ---------- UTILIDADES ----------
   const zeros = () => Array(N).fill(0);
@@ -122,7 +136,7 @@
       operativo: 'Esta semana no llegan las reposiciones ni los traslados. Lo pendiente no se pierde: se suma a lo que llega la próxima semana.' },
   ];
   const EVENTO_PRIMERA_RONDA = 5;   // primera semana en la que se evalúa un evento
-  const EVENTO_PROB_INICIAL = 40;   // % de probabilidad de la primera evaluación
+  const EVENTO_PROB_INICIAL = 31;   // % de probabilidad de la primera evaluación
   const EVENTO_PROB_PASO = 5;       // sube 5 puntos por cada evaluación sin evento
   const EVENTO_ESPERA = 5;          // semanas desde que aparece un evento hasta la siguiente evaluación
   const eventoPorId = (id) => EVENTOS.find((e) => e.id === id) || null;
@@ -583,7 +597,7 @@
   }
 
   const API = {
-    VERSION, CONFIG, PRODUCTOS, CALIDADES, INFLUENCERS, INF_KEYS, EQUIPOS, ROLES,
+    VERSION, CONFIG, PRODUCTOS, PRODUCTOS_TODOS, DIFICULTADES, setSabores, CALIDADES, INFLUENCERS, INF_KEYS, EQUIPOS, ROLES,
     EVENTOS, eventoPorId, eventoActivo, prepararEvento,
     estadoInicial, avanzarRonda, reproducir, armarDecisiones, puntajes, sumaUtil,
     factorInfluencers, calidadPromedio, crearRng, leerDecision, decisionBot, BOT,

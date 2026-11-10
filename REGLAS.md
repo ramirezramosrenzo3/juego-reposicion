@@ -1,4 +1,4 @@
-# Reglas del juego de reposición (versión 4.2.3)
+# Reglas del juego de reposición (versión 4.3.1)
 
 Esta es la referencia del juego. Los números exactos están en `game.js` (bloque `CONFIG`, `PRODUCTOS`, `CALIDADES`, `INFLUENCERS`). Si este documento y el código no coinciden, avísame para corregir uno de los dos.
 
@@ -99,7 +99,7 @@ Qué significa en el juego:
 - Cada semana, el distribuidor de cada equipo puede pujar por cualquiera de los tres, por ninguno o por varios. **La puja es solo un monto** (de $1 a $10,000); no elige sabor. Pon 0 para no pujar.
 - Las pujas son **secretas**.
 - **Gana el monto más alto, y paga ese monto.** El que pierde no paga nada.
-- **Empate en el monto más alto:** gana el equipo con **mejor calidad promedio** (promedio del factor de calidad de sus 5 sabores: económico 0.85, estándar 1.00, premium 1.25). Si también empatan en calidad, **gana al azar**.
+- **Empate en el monto más alto:** gana el equipo con **mejor calidad promedio** (promedio del factor de calidad de sus sabores: económico 0.85, estándar 1.00, premium 1.25). Si también empatan en calidad, **gana al azar**.
 - Un influencer ganado dura **2 semanas** (la semana en que se gana y la siguiente). Mientras está ocupado no se puede pujar por él, y la puja se ignora sin cobrarse.
 - La subida de cada influencer se sortea al ganarlo, dentro de su rango.
 - Si un equipo tiene dos influencers, sus subidas **se multiplican**.
@@ -171,4 +171,7 @@ Un bot es un jugador que maneja el juego. Ocupa un lugar (fábrica, distribuidor
 - No son expertos: son un rival razonable para probar el juego y completar equipos, no un jugador óptimo.
 
 ## 17. Eventos aleatorios
-Desde la semana 5 se evalúa si aparece un evento: 40 % la primera vez; cada evaluación fallida suma 5 puntos (máximo 100 %). Al aparecer se elige uno de los 9 con igual probabilidad entre los que aún no salieron en esa partida (un evento no se repite hasta que hayan salido los 9), la probabilidad vuelve a 40 % y se espera 5 semanas. No hay eventos simultáneos. El efecto empieza de inmediato, dura lo indicado (4 semanas; la huelga, 1) y modifica temporalmente la demanda base de cada sabor. La **huelga** no cambia la demanda: ese cierre de semana no se procesan llegadas (producción ni traslados); lo pendiente llega junto con lo de la semana siguiente. La presentación del evento dura 15 s (la semana recibe 15 s extra). Los eventos se calculan con la semilla de la sala, así que todos los celulares ven lo mismo. El catálogo completo está en `GUIA.md`.
+Desde la semana 5 se evalúa si aparece un evento: 31 % la primera vez; cada evaluación fallida suma 5 puntos (máximo 100 %). Al aparecer se elige uno de los 9 con igual probabilidad entre los que aún no salieron en esa partida (un evento no se repite hasta que hayan salido los 9), la probabilidad vuelve a 31 % y se espera 5 semanas. No hay eventos simultáneos. El efecto empieza de inmediato, dura lo indicado (4 semanas; la huelga, 1) y modifica temporalmente la demanda base de cada sabor. La **huelga** no cambia la demanda: ese cierre de semana no se procesan llegadas (producción ni traslados); lo pendiente llega junto con lo de la semana siguiente. La presentación del evento dura 15 s (la semana recibe 15 s extra). Los eventos se calculan con la semilla de la sala, así que todos los celulares ven lo mismo. El catálogo completo está en `GUIA.md`.
+
+## 18. Dificultad
+Al crear la sala se elige 3, 4 o 5 sabores (de arriba hacia abajo: chocolate, vainilla, menta, fresa, mora). Todas las reglas son iguales; solo cambia la cantidad de sabores en producción, pedidos, demanda y ventas.

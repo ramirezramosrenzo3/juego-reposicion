@@ -1,5 +1,5 @@
 -- =====================================================================
---  JUEGO DE REPOSICIÓN - BASE DE DATOS (versión 4.2.2: eventos aleatorios)
+--  JUEGO DE REPOSICIÓN - BASE DE DATOS (versión 4.3.1: eventos aleatorios)
 --  Pegar TODO este archivo en Supabase > SQL Editor > Run.
 --  Se puede ejecutar más de una vez sin error y no borra partidas.
 -- =====================================================================
@@ -16,6 +16,7 @@ create table if not exists salas (
   creada_en timestamptz not null default now()
 );
 alter table salas add column if not exists eleccion_fin timestamptz;
+alter table salas add column if not exists sabores smallint not null default 5;   -- dificultad: 3, 4 o 5 sabores
 
 create table if not exists jugadores (
   sala text not null references salas(codigo) on delete cascade,
@@ -144,7 +145,8 @@ end $$;
 
 -- ---------- FUNCIONES PÚBLICAS (las usa la app) ----------
 drop function if exists crear_sala(text, uuid, int, int);
-create or replace function crear_sala(p_nombre text, p_jugador uuid, p_rondas int, p_segundos int, p_avatar int default null)
+drop function if exists crear_sala(text, uuid, int, int, int);
+create or replace function crear_sala(p_nombre text, p_jugador uuid, p_rondas int, p_segundos int, p_avatar int default null, p_sabores int default 5)
 returns text
 language plpgsql security definer set search_path = public as $$
 declare
@@ -155,6 +157,7 @@ begin
   if trim(coalesce(p_nombre, '')) = '' then raise exception 'Escribe tu nombre'; end if;
   if length(trim(p_nombre)) > 20 then raise exception 'El nombre tiene más de 20 letras'; end if;
   if p_avatar is not null and (p_avatar < 1 or p_avatar > 16) then raise exception 'Avatar no válido'; end if;
+  if p_sabores not in (3, 4, 5) then raise exception 'La dificultad debe ser de 3, 4 o 5 sabores'; end if;
   if p_rondas < 5 or p_rondas > 60 then raise exception 'Las semanas deben estar entre 5 y 60'; end if;
   if p_segundos < 20 or p_segundos > 180 then raise exception 'Los segundos deben estar entre 20 y 180'; end if;
   loop
@@ -164,8 +167,8 @@ begin
     end loop;
     exit when not exists (select 1 from salas where codigo = c);
   end loop;
-  insert into salas (codigo, total_rondas, segundos, semilla, anfitrion)
-  values (c, p_rondas, p_segundos, floor(random() * 2000000000)::int, p_jugador);
+  insert into salas (codigo, total_rondas, segundos, semilla, anfitrion, sabores)
+  values (c, p_rondas, p_segundos, floor(random() * 2000000000)::int, p_jugador, p_sabores);
   insert into jugadores (sala, id, nombre, es_anfitrion, avatar)
   values (c, p_jugador, trim(p_nombre), true, coalesce(p_avatar, 1 + floor(random() * 16)::int));
   return c;
@@ -500,7 +503,7 @@ alter table decisiones enable row level security;
 alter table extras enable row level security;
 
 revoke all on salas, jugadores, rondas, decisiones, extras from anon, authenticated;
-grant select (codigo, estado, total_rondas, segundos, semilla, iniciada_en, creada_en, eleccion_fin)
+grant select (codigo, estado, total_rondas, segundos, semilla, iniciada_en, creada_en, eleccion_fin, sabores)
   on salas to anon, authenticated;
 grant select (sala, nombre, equipo, rol, unido_en, es_anfitrion, es_bot, avatar)
   on jugadores to anon, authenticated;

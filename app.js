@@ -31,7 +31,7 @@
     sin_puja: 'No pujaste',
   };
   // Solo las columnas que la base permite leer (los ids y el anfitrión son secretos)
-  const COLS_SALA = 'codigo,estado,total_rondas,segundos,semilla,iniciada_en,creada_en,eleccion_fin';
+  const COLS_SALA = 'codigo,estado,total_rondas,segundos,semilla,iniciada_en,creada_en,eleccion_fin,sabores';
   const COLS_JUG = 'sala,nombre,equipo,rol,unido_en,es_anfitrion,es_bot,avatar';
   const COLS_RON = 'sala,numero,cerrada_en';
   const COLS_DEC = 'sala,ronda,equipo,rol,payload,enviada_en';
@@ -47,6 +47,7 @@
   }
   let nombre = guardado('nombre') || '';
   let avatarSel = Number(guardado('avatar')) || 0;
+  let dificultad = [3, 4, 5].includes(Number(guardado('dificultad'))) ? Number(guardado('dificultad')) : 5;
   let sala = guardado('sala') || null;
   const codigoUrl = (new URLSearchParams(location.search).get('sala') || '').toUpperCase();
   // Si el link trae otra sala, esa sala reemplaza a la guardada
@@ -147,7 +148,12 @@
           </label>
         </div>
         <p class="ayuda" id="pide-av" ${avatarSel ? 'hidden' : ''}>Toca uno de los 16 avatares para empezar.</p>
-        <h2>2. Crea una sala o únete</h2>
+        <h2>2. Dificultad</h2>
+        <div class="dif" id="dif">
+          ${JR.DIFICULTADES.map((d) => `<button type="button" class="dif-op ${d.sabores === dificultad ? 'sel' : ''}" data-accion="dificultad" data-n="${d.sabores}">
+            <b>${d.sabores} sabores</b><small>${esc(d.nombre)}</small></button>`).join('')}
+        </div>
+        <h2>3. Crea una sala o únete</h2>
         <div class="fila">
           <label>Semanas (5 a 60)
             <input id="rondas" type="number" value="30" min="5" max="60" inputmode="numeric">
@@ -241,6 +247,12 @@
     return true;
   }
 
+  function elegirDificultad(n) {
+    dificultad = n;
+    guardar('dificultad', String(n));
+    document.querySelectorAll('#dif .dif-op').forEach((b) => b.classList.toggle('sel', Number(b.dataset.n) === n));
+  }
+
   function elegirAvatar(id) {
     avatarSel = id;
     guardar('avatar', String(id));
@@ -256,7 +268,7 @@
     if (!perfilListo()) return;
     const { data, error } = await sb.rpc('crear_sala', {
       p_nombre: nombre, p_jugador: jugadorId, p_rondas: Number(val('rondas')), p_segundos: Number(val('segundos')),
-      p_avatar: avatarSel,
+      p_avatar: avatarSel, p_sabores: dificultad,
     });
     if (error) return aviso(mensajeError(error));
     entrar(data);
@@ -267,7 +279,7 @@
     if (!perfilListo()) return;
     const crear = await sb.rpc('crear_sala', {
       p_nombre: nombre, p_jugador: jugadorId, p_rondas: Number(val('rondas')), p_segundos: Number(val('segundos')),
-      p_avatar: avatarSel,
+      p_avatar: avatarSel, p_sabores: dificultad,
     });
     if (crear.error) return aviso(mensajeError(crear.error));
     const codigo = crear.data;
@@ -380,6 +392,7 @@
       const a = b.dataset.accion;
       if (a === 'iniciar-juego') construir('inicio');
       else if (a === 'avatar') elegirAvatar(Number(b.dataset.id));
+      else if (a === 'dificultad') elegirDificultad(Number(b.dataset.n));
       else if (a === 'crear') await crearSala();
       else if (a === 'solo') await jugarSolo();
       else if (a === 'bots') await completarBots();
@@ -500,6 +513,7 @@
     const s = datos.sala;
     const porRonda = JR.armarDecisiones(datos.decisiones, s.total_rondas);
     const cerradas = datos.rondas.length;
+    JR.setSabores(s.sabores);
     estado = JR.reproducir(s.semilla, porRonda.slice(0, cerradas));
     actual = cerradas + 1;
   }
@@ -529,7 +543,7 @@
       <p>Código de sala: <strong class="codigo">${esc(s.codigo)}</strong></p>
       <p class="ayuda">Comparte este link con tus amigos (ya trae el código):</p>
       <input class="link" readonly value="${esc(link)}" onclick="this.select()">
-      <p>Semanas: <b>${s.total_rondas}</b> · Segundos por decisión: <b>${s.segundos}</b></p>
+      <p>Semanas: <b>${s.total_rondas}</b> · Segundos por decisión: <b>${s.segundos}</b> · Sabores: <b>${s.sabores || 5}</b></p>
       <p>Jugadores: <b>${datos.jugadores.length}/6</b> (${personas} ${personas === 1 ? 'persona' : 'personas'}${hayBots ? `, ${datos.jugadores.length - personas} ${datos.jugadores.length - personas === 1 ? 'bot' : 'bots'}` : ''})</p>
       <ul class="lista sin-punto">${lista}</ul>
       ${soyAnfitrion
@@ -546,7 +560,7 @@
           <li>Cada equipo tiene fábrica → distribuidor → tienda. Cada rol decide su área.</li>
           <li>Los bots 🤖 ocupan los lugares vacíos y deciden solos cada semana; no hacen falta 6 personas.</li>
           <li>Fábrica: calidad y producción. Distribuidor: pedidos a fábrica y pujas por influencers. Tienda: precio y pedidos al distribuidor.</li>
-          <li>Hay 5 sabores. La demanda es del mercado y la comparten los dos equipos; cambia cada semana.</li>
+          <li>Hay ${s.sabores || 5} sabores. La demanda es del mercado y la comparten los dos equipos; cambia cada semana.</li>
           <li>Ganancia del equipo = ventas − costo de lo vendido − mantenimiento del stock − pujas pagadas.</li>
           <li>Si no envías tu decisión antes de que acabe el tiempo, se envía sola lo que tengas en pantalla.</li>
           <li>Influencers (opcionales): suben la demanda de todos los sabores de su equipo. Las pujas son secretas: gana el monto más alto y paga ese monto. Si hay empate, gana el equipo con mejor calidad.</li>
@@ -637,7 +651,7 @@
     const ev = estado && estado.evento;
     return ev && actual >= ev.inicio && actual <= ev.fin ? JR.eventoPorId(ev.id) : null;
   };
-  const efectosHtml = (def) => Object.keys(def.efectos).map(Number).sort((a, b) => a - b).map((i) => {
+  const efectosHtml = (def) => Object.keys(def.efectos).map(Number).filter((i) => i < PRODUCTOS.length).sort((a, b) => a - b).map((i) => {
     const f = def.efectos[i];
     return `<div class="ev-ef ${f > 0 ? 'sube' : 'baja'}"><img src="img/galleta${i + 1}.png" alt=""><span>${esc(PRODUCTOS[i].nombre)}</span><b>${pctTxt(f)}</b></div>`;
   }).join('');
