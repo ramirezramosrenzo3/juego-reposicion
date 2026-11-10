@@ -463,13 +463,13 @@ seccion('9. Bots');
   ok(primeras.every((r) => r >= 5), 'ningún evento aparece antes de la semana 5');
   ok(gaps && !solapes, 'entre un evento y el siguiente pasan al menos 5 semanas y nunca hay dos a la vez');
   const en5 = primeras.filter((r) => r === 5).length / 400;
-  ok(en5 > 0.22 && en5 < 0.38, `la primera evaluación (semana 5) acierta cerca del 30% (${(en5 * 100).toFixed(0)}%)`);
+  ok(en5 > 0.32 && en5 < 0.48, `la primera evaluación (semana 5) acierta cerca del 40% (${(en5 * 100).toFixed(0)}%)`);
   ok(calendario(555, 40).length > 0 || calendario(777, 40).length > 0, 'en 40 semanas aparecen eventos');
   ok(JSON.stringify(calendario(4242, 40)) === JSON.stringify(calendario(4242, 40)), 'el calendario es igual en todos los celulares');
   // la probabilidad sube de 5 en 5 y nunca pasa de 100
   const pe = J2.estadoInicial(); pe.semilla = 99; const ps = [];
   for (let r = 2; r <= 40 && !pe.evento; r++) { J2.prepararEvento(pe, r); ps.push(pe.probEvento); }
-  ok(ps.every((p, i) => i === 0 || p === 30 || p === ps[i - 1] + 5 || p === 100), 'la probabilidad sube 5 puntos por intento sin evento');
+  ok(ps.every((p, i) => i === 0 || p === 40 || p === ps[i - 1] + 5 || p === 100), 'la probabilidad sube 5 puntos por intento sin evento');
   const p100 = J2.estadoInicial(); p100.semilla = 1; p100.probEvento = 98; p100.proxEval = 2;
   // sin evento posible: forzar fallo con probabilidad 98 → nunca pasa de 100
   for (let k = 0; k < 3; k++) { p100.evento = null; p100.probEvento = Math.min(100, p100.probEvento + 5); }

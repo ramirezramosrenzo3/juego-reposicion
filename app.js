@@ -678,7 +678,7 @@
     document.body.classList.remove('con-evento');
   }
 
-  // Presenta el evento 10 s (sin botón de cerrar) y pide al servidor 10 s extra para que nadie pierda tiempo de decisión
+  // Presenta el evento 15 s (sin botón de cerrar) y pide al servidor 15 s extra para que nadie pierda tiempo de decisión
   function gestionarEvento() {
     const def = eventoAhora();
     const sem = vista && vista.semana;
@@ -688,7 +688,7 @@
       sb.rpc('extender_ronda', { p_codigo: sala, p_jugador: jugadorId, p_ronda: actual }).then(() => {}, () => {});
     }
     if (popup || popupVisto === actual) return;
-    const fin = Date.parse(sem.inicio) + 10000;
+    const fin = Date.parse(sem.inicio) + 15000;
     if (isNaN(fin) || fin <= ahoraServidor()) { popupVisto = actual; return; }
     popup = { ronda: actual, fin };
     popupVisto = actual;
@@ -1056,7 +1056,7 @@
       const rest = popup.fin - ahoraServidor();
       if (rest <= 0) cerrarPopup();
       else {
-        const b = $('ev-prog'); if (b) b.style.transform = `scaleX(${Math.max(0, Math.min(1, rest / 10000))})`;
+        const b = $('ev-prog'); if (b) b.style.transform = `scaleX(${Math.max(0, Math.min(1, rest / 15000))})`;
         const t = $('ev-seg'); if (t) t.textContent = Math.ceil(rest / 1000) + ' s';
       }
     }

@@ -55,7 +55,7 @@
   const N = PRODUCTOS.length;
 
   // Versión del motor: se muestra en la sala para detectar celulares con reglas distintas
-  const VERSION = '4.2.1';
+  const VERSION = '4.2.2';
 
   // ---------- UTILIDADES ----------
   const zeros = () => Array(N).fill(0);
@@ -102,27 +102,27 @@
   // (chocolate, vainilla, menta, fresa, mora). Los sabores que no aparecen no cambian.
   const EVENTOS = [
     { id: 'navidad', nombre: 'Navidad', duracion: 4, efectos: { 0: 0.20, 1: 0.20, 4: -0.10 },
-      desc: '¡Llegó la Navidad! Las personas se preparan para celebrar las fiestas y aumenta el consumo de galletas tradicionales.' },
+      desc: 'Llegó la Navidad, aumenta el consumo de galletas tradicionales.' },
     { id: 'maincra', nombre: 'MAINCRA', duracion: 4, efectos: { 0: -0.15, 1: -0.15, 2: -0.15, 3: -0.15, 4: 0.05 },
-      desc: '¡Se descubrieron ratas en la cocina! La noticia se ha extendido rápidamente y los clientes han perdido la confianza en los productos.' },
+      desc: '¡Ratas en la cocina! Que inicie la desratización.' },
     { id: 'cyber', nombre: 'Cyber Galletas', duracion: 4, efectos: { 3: 0.10, 1: 0.10, 4: 0.04 },
-      desc: '¡Llegaron las ofertas de Cyber Galletas! Las promociones digitales han despertado el interés de los consumidores por algunos sabores.' },
+      desc: 'Llegaron las ofertas de Cyber Galletas.' },
     { id: 'covid', nombre: 'COVID-20', duracion: 4, efectos: { 0: -0.07, 1: -0.07 },
-      desc: '¡Una pequeña gripe se ha extendido por el mundo! La preocupación por la salud y las compras de emergencia hacen que las personas prefieran comprar papel higiénico en lugar de galletas.' },
+      desc: 'La gente empezará a comprar más papel higiénico que galletas.' },
     { id: 'nino', nombre: 'Fenómeno del Niño', duracion: 4, efectos: { 0: -0.16, 3: 0.12, 4: 0.05 },
-      desc: '¡Hace tanto calor que el chocolate se derrite! Los consumidores comienzan a preferir sabores más refrescantes para combatir las altas temperaturas.' },
+      desc: '¡Lima está que arde! Todo se derrite...' },
     { id: 'mochila', nombre: 'Mochila perdida', duracion: 4, efectos: { 2: -0.11, 1: -0.11 },
-      desc: 'Durante un paseo escolar se perdió una mochila llena de galletas. El incidente ha generado preocupación entre los estudiantes y sus familias.' },
+      desc: 'Durante un paseo escolar se perdió una mochila llena de galletas.' },
     { id: 'happy', nombre: 'Happy Cookies', duracion: 4, efectos: { 2: 0.19, 0: -0.03, 1: -0.03, 3: -0.03, 4: -0.03 },
-      desc: '¡El sabor de la menta ya no es menta...! Un cambio inesperado en la percepción del producto ha despertado la curiosidad de los consumidores.' },
+      desc: 'El sabor de la menta... ¿es más pastoso?' },
     { id: 'muffin', nombre: '¡¡¡ALERTA MUFFIN!!!', duracion: 4, efectos: { 0: -0.09, 1: -0.09, 4: -0.09 },
-      desc: '¡Ha llegado un nuevo competidor al mercado! Una nueva empresa comienza a vender MUFFINS y amenaza con quitarle clientes al negocio de las galletas.' },
+      desc: 'Ha llegado un nuevo competidor de MUFFINS.' },
     { id: 'huelga', nombre: 'Huelga de transportistas', duracion: 1, efectos: {}, logistico: true,
-      desc: '¡Han cerrado toda circulación desde Ica hasta Lima! La huelga de transportistas impide el traslado habitual de mercancías y productos.',
+      desc: 'Han cerrado la Panamericana Sur entre Ica y Lima.',
       operativo: 'Esta semana no llegan las reposiciones ni los traslados. Lo pendiente no se pierde: se suma a lo que llega la próxima semana.' },
   ];
   const EVENTO_PRIMERA_RONDA = 5;   // primera semana en la que se evalúa un evento
-  const EVENTO_PROB_INICIAL = 30;   // % de probabilidad de la primera evaluación
+  const EVENTO_PROB_INICIAL = 40;   // % de probabilidad de la primera evaluación
   const EVENTO_PROB_PASO = 5;       // sube 5 puntos por cada evaluación sin evento
   const EVENTO_ESPERA = 5;          // semanas desde que aparece un evento hasta la siguiente evaluación
   const eventoPorId = (id) => EVENTOS.find((e) => e.id === id) || null;

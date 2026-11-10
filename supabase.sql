@@ -1,5 +1,5 @@
 -- =====================================================================
---  JUEGO DE REPOSICIÓN - BASE DE DATOS (versión 4.2: eventos aleatorios)
+--  JUEGO DE REPOSICIÓN - BASE DE DATOS (versión 4.2.2: eventos aleatorios)
 --  Pegar TODO este archivo en Supabase > SQL Editor > Run.
 --  Se puede ejecutar más de una vez sin error y no borra partidas.
 -- =====================================================================
@@ -55,7 +55,7 @@ create table if not exists decisiones (
 alter table decisiones add column if not exists equipo text;
 alter table decisiones add column if not exists rol text;
 
--- Tiempo extra de una semana (los 10 s de la presentación de un evento aleatorio)
+-- Tiempo extra de una semana (los 15 s de la presentación de un evento aleatorio)
 create table if not exists extras (
   sala text not null references salas(codigo) on delete cascade,
   ronda int not null,
@@ -449,7 +449,7 @@ begin
   ), '[]'::json);
 end $$;
 
--- Un evento aleatorio da 10 segundos extra a la semana (para su presentación obligatoria).
+-- Un evento aleatorio da 15 segundos extra a la semana (para su presentación obligatoria).
 -- Cualquier celular de la partida puede pedirlo; solo se aplica una vez por semana.
 create or replace function extender_ronda(p_codigo text, p_jugador uuid, p_ronda int) returns void
 language plpgsql security definer set search_path = public as $$
@@ -460,7 +460,7 @@ begin
   if not found or s.estado <> 'jugando' then return; end if;
   if not exists (select 1 from jugadores where sala = p_codigo and id = p_jugador and rol is not null and not es_bot) then return; end if;
   if p_ronda <> ronda_actual(p_codigo) or p_ronda > s.total_rondas then return; end if;
-  insert into extras (sala, ronda, segs) values (p_codigo, p_ronda, 10) on conflict do nothing;
+  insert into extras (sala, ronda, segs) values (p_codigo, p_ronda, 15) on conflict do nothing;
 end $$;
 
 -- Estado de la semana en curso: número, cuántos decidieron (y quiénes: solo "equipo:rol"),
