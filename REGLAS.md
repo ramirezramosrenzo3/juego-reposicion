@@ -1,4 +1,4 @@
-# Reglas del juego de reposición (versión 4.2.2)
+# Reglas del juego de reposición (versión 4.2.3)
 
 Esta es la referencia del juego. Los números exactos están en `game.js` (bloque `CONFIG`, `PRODUCTOS`, `CALIDADES`, `INFLUENCERS`). Si este documento y el código no coinciden, avísame para corregir uno de los dos.
 
@@ -171,4 +171,4 @@ Un bot es un jugador que maneja el juego. Ocupa un lugar (fábrica, distribuidor
 - No son expertos: son un rival razonable para probar el juego y completar equipos, no un jugador óptimo.
 
 ## 17. Eventos aleatorios
-Desde la semana 5 se evalúa si aparece un evento: 40 % la primera vez; cada evaluación fallida suma 5 puntos (máximo 100 %). Al aparecer se elige uno de los 9 con igual probabilidad, la probabilidad vuelve a 40 % y se espera 5 semanas. No hay eventos simultáneos. El efecto empieza de inmediato, dura lo indicado (4 semanas; la huelga, 1) y modifica temporalmente la demanda base de cada sabor. La **huelga** no cambia la demanda: ese cierre de semana no se procesan llegadas (producción ni traslados); lo pendiente llega junto con lo de la semana siguiente. La presentación del evento dura 15 s (la semana recibe 15 s extra). Los eventos se calculan con la semilla de la sala, así que todos los celulares ven lo mismo. El catálogo completo está en `GUIA.md`.
+Desde la semana 5 se evalúa si aparece un evento: 40 % la primera vez; cada evaluación fallida suma 5 puntos (máximo 100 %). Al aparecer se elige uno de los 9 con igual probabilidad entre los que aún no salieron en esa partida (un evento no se repite hasta que hayan salido los 9), la probabilidad vuelve a 40 % y se espera 5 semanas. No hay eventos simultáneos. El efecto empieza de inmediato, dura lo indicado (4 semanas; la huelga, 1) y modifica temporalmente la demanda base de cada sabor. La **huelga** no cambia la demanda: ese cierre de semana no se procesan llegadas (producción ni traslados); lo pendiente llega junto con lo de la semana siguiente. La presentación del evento dura 15 s (la semana recibe 15 s extra). Los eventos se calculan con la semilla de la sala, así que todos los celulares ven lo mismo. El catálogo completo está en `GUIA.md`.

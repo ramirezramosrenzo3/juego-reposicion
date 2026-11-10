@@ -434,7 +434,19 @@ seccion('9. Bots');
 // ---------- EVENTOS ALEATORIOS (4.2) ----------
 {
   const J2 = J;
-  ok(J2.EVENTOS.length === 9, 'hay 9 eventos');
+  { // sin repetir evento en una misma partida
+  let rep = 0, vistos = 0;
+  for (let sd = 1; sd <= 300; sd++) {
+    const e = J2.estadoInicial(); e.semilla = sd;
+    const sal = [];
+    for (let n = 1; n <= 80; n++) { J2.prepararEvento(e, n); if (e.evento && e.evento.inicio === n) sal.push(e.evento.id); }
+    vistos += sal.length;
+    const ciclo = sal.slice(0, 9);
+    if (new Set(ciclo).size !== ciclo.length) rep++;
+  }
+  ok(vistos > 300 && rep === 0, `ningún evento se repite dentro de una partida (${vistos} eventos en 300 partidas)`);
+}
+ok(J2.EVENTOS.length === 9, 'hay 9 eventos');
   const ev = (id) => J2.eventoPorId(id);
   const cerca2 = (a, b) => Math.abs(a - b) < 1e-9;
   ok(cerca2(ev('navidad').efectos[0], 0.2) && cerca2(ev('navidad').efectos[4], -0.1) && ev('navidad').efectos[2] === undefined, 'Navidad: chocolate +20, vainilla +20, mora −10');

@@ -55,7 +55,7 @@
   const N = PRODUCTOS.length;
 
   // Versión del motor: se muestra en la sala para detectar celulares con reglas distintas
-  const VERSION = '4.2.2';
+  const VERSION = '4.2.3';
 
   // ---------- UTILIDADES ----------
   const zeros = () => Array(N).fill(0);
@@ -135,7 +135,13 @@
     if (estado.evento || n < estado.proxEval) return;
     const rng = crearRng((estado.semilla ^ Math.imul(n, 0x85ebca6b) ^ 0x5bd1e995) >>> 0);
     if (rng() < estado.probEvento / 100) {
-      const ev = EVENTOS[Math.min(EVENTOS.length - 1, Math.floor(rng() * EVENTOS.length))];
+      // Un evento no se repite en la misma partida: se elige entre los que aún no salieron
+      // (si ya salieron los 9, el ciclo se reinicia)
+      let usados = estado.eventosUsados || [];
+      if (usados.length >= EVENTOS.length) usados = [];
+      const libres = EVENTOS.filter((x) => !usados.includes(x.id));
+      const ev = libres[Math.min(libres.length - 1, Math.floor(rng() * libres.length))];
+      estado.eventosUsados = usados.concat(ev.id);
       estado.evento = { id: ev.id, inicio: n, fin: n + ev.duracion - 1 };
       estado.probEvento = EVENTO_PROB_INICIAL;
       estado.proxEval = n + EVENTO_ESPERA;
@@ -177,7 +183,7 @@
     const inf = {};
     INF_KEYS.forEach((k) => { inf[k] = { ocupadoHasta: 0, dueno: null, uplift: 0, hasta: -1 }; });
     return { ronda: 0, inf, equipos: { A: equipo(), B: equipo() }, historial: [],
-      semilla: null, evento: null, probEvento: EVENTO_PROB_INICIAL, proxEval: EVENTO_PRIMERA_RONDA };
+      semilla: null, evento: null, eventosUsados: [], probEvento: EVENTO_PROB_INICIAL, proxEval: EVENTO_PRIMERA_RONDA };
   }
 
   // ---------- LECTURA DE DECISIONES (siempre limpia y acotada) ----------
