@@ -133,6 +133,7 @@
         <div class="escenas"><img src="img/fabrica.png" alt=""><img src="img/distribucion.png" alt=""><img src="img/tienda.png" alt=""></div>
         <button class="principal btn-iniciar" data-accion="iniciar-juego">INICIAR</button>
         <p class="pie">Versión ${esc(JR.VERSION)}</p>
+        <p class="copy">© 2026 - Ningún derecho reservado<br>Se permite su uso comercial</p>
       </section>`,
     inicio: () => `
       <section class="card">
