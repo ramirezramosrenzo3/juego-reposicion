@@ -69,7 +69,7 @@
   }
 
   // Versión del motor: se muestra en la sala para detectar celulares con reglas distintas
-  const VERSION = '5.1.2';
+  const VERSION = '5.1.3';
 
   // ---------- UTILIDADES ----------
   const zeros = () => Array(N).fill(0);
@@ -143,12 +143,12 @@
   // Se confirman en la semana t: el costo sale del dinero compartido del equipo al cerrar esa semana
   // y el efecto se ejecuta al procesar la semana t+1. El cobro no depende de que haya algo que dañar.
   const HABILIDADES = [
-    { id: 'incendio', rol: 'tienda',       nombre: 'Incendio',  pct: 0.30, costo: 70, enfriamiento: 8, aviso: 'INCENDIO: -30% INVENTARIO' },
-    { id: 'fake',     rol: 'distribuidor', nombre: 'Fake News', pct: 0.15, duracion: 2, costo: 50, enfriamiento: 6, aviso: 'FAKE NEWS: -15% DEMANDA' },
-    { id: 'gta',      rol: 'fabrica',      nombre: 'GTA',       pct: 0.35, costo: 110, enfriamiento: 10, aviso: 'GTA: -35% TRANSPORTE' },
+    { id: 'incendio', rol: 'tienda',       nombre: 'Incendio',  pct: 0.30, costo: 40, enfriamiento: 8, aviso: 'INCENDIO: -30% INVENTARIO' },
+    { id: 'fake',     rol: 'distribuidor', nombre: 'Fake News', pct: 0.15, duracion: 2, costo: 120, enfriamiento: 6, aviso: 'FAKE NEWS: -15% DEMANDA' },
+    { id: 'gta',      rol: 'fabrica',      nombre: 'GTA',       pct: 0.35, costo: 100, enfriamiento: 10, aviso: 'GTA: -35% TRANSPORTE' },
   ];
   const habPorId = (id) => HABILIDADES.find((h) => h.id === id) || null;
-  // Costo en dinero del equipo (valores para 5 sabores; con 3 o 4 sabores baja en proporción,
+  // Costo en dinero del equipo (valores para 5 sabores; con 4 sabores es el 80 % y con 3 sabores el 60 %,
   // porque también baja lo que se mueve en la partida)
   const costoHab = (def) => (def.costo > 0 ? Math.max(5, Math.round((def.costo * N) / 5 / 5) * 5) : 0);
   const habDeRol = (rol) => HABILIDADES.find((h) => h.rol === rol) || null;

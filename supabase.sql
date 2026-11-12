@@ -1,5 +1,5 @@
 -- =====================================================================
---  JUEGO DE REPOSICIÓN - BASE DE DATOS (versión 4.3.1: eventos aleatorios)
+--  JUEGO DE REPOSICIÓN - BASE DE DATOS (versión 5.1.3: eventos aleatorios)
 --  Pegar TODO este archivo en Supabase > SQL Editor > Run.
 --  Se puede ejecutar más de una vez sin error y no borra partidas.
 -- =====================================================================
@@ -524,3 +524,9 @@ create policy "lectura rondas" on rondas for select using (true);
 -- Las decisiones solo se pueden leer cuando su semana ya cerró (pujas secretas)
 create policy "lectura decisiones cerradas" on decisiones for select
   using (ronda < ronda_actual(sala));
+
+-- Funciones auxiliares con ruta de búsqueda fija (recomendación de seguridad de Supabase)
+alter function ronda_actual(text) set search_path = public;
+alter function inicio_ronda(text, int) set search_path = public;
+alter function gracia_envio() set search_path = public;
+alter function fin_ronda(text, int) set search_path = public;
